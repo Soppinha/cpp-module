@@ -1,0 +1,86 @@
+================================================================
+               CPP MODULE 02 — O QUE FIZ E POR QUÊ
+================================================================
+
+----------------------------------------------------------------
+EX00 — My First Class in Orthodox Canonical Form
+----------------------------------------------------------------
+O que fiz:
+    Classe Fixed com:
+    - _rawBits como único atributo (int)
+    - _fractBits = 8 (const estático)
+    - Os quatro membros da forma canônica, todos com mensagens
+      de log no cout.
+    - getRawBits() e setRawBits()
+
+Por que fiz assim:
+    O exercício pede explicitamente a forma canônica e exige
+    as mensagens de log para mostrar quando cada membro é chamado.
+    O construtor de cópia delega para operator= (evita duplicar
+    a lógica de copiar _rawBits).
+
+----------------------------------------------------------------
+EX01 — Towards a more useful fixed-point number class
+----------------------------------------------------------------
+O que fiz:
+    Adicionei ao Fixed:
+    - Construtor int: n << _fractBits desloca os bits para a
+      parte inteira da representação.
+    - Construtor float: roundf(n * (1 << _fractBits)) converte
+      para rawBits arredondando.
+    - toFloat(): rawBits / 256.0 como float.
+    - toInt():   rawBits >> 8 descarta a parte fracionária.
+    - operator<< para imprimir o valor flutuante no ostream.
+
+Por que fiz assim:
+    Deslocar bits é a operação natural para ponto fixo: multiplicar
+    por 2^N move o valor para a parte inteira do inteiro subjacente.
+    Usei roundf() em vez de truncar para minimizar o erro de
+    conversão float→fixo. Removi os logs de getRawBits() que
+    estavam no ex00 pois agora poluiriam a saída aritmética.
+
+----------------------------------------------------------------
+EX02 — Now we're talking
+----------------------------------------------------------------
+O que fiz:
+    Adicionei todos os operadores:
+    - Comparação (>, <, >=, <=, ==, !=): comparam _rawBits direto.
+    - Aritmética (+, -, *, /): criam um Fixed de resultado e
+      operam nos rawBits.
+    - Multiplicação usa long long antes de deslocar para evitar
+      overflow: (long long)a * b >> 8.
+    - Divisão usa long long com shift antes de dividir:
+      (long long)a << 8 / b.
+    - Incremento/decremento pré e pós.
+    - min() e max() estáticos em versão mutável e const.
+
+Por que fiz assim:
+    Operar em rawBits diretamente é o ponto central de ponto fixo:
+    comparações e adição/subtração funcionam exatamente como em
+    inteiros. Multiplicação e divisão precisam de ajuste de escala
+    (shift) porque multiplicar dois valores já escalonados dobra
+    o fator de escala.
+    Long long evita overflow na multiplicação antes do shift:
+    se _rawBits for ~2^23 (valor grande com 8 bits frac), o
+    produto de dois fica em ~2^46, que cabe em long long (64 bits)
+    mas não em int (32 bits).
+
+----------------------------------------------------------------
+EX03 — BSP
+----------------------------------------------------------------
+O que fiz:
+    Classe Point com x e y do tipo Fixed (const — imutável).
+    bsp() recebe três vértices e um ponto e usa cross() para
+    calcular o produto vetorial em relação a cada aresta.
+    Retorna true só se todos os três sinais forem iguais E
+    nenhum for zero (ponto exatamente na aresta = falso).
+
+Por que fiz assim:
+    O produto vetorial 2D mede de que lado da reta o ponto está.
+    Se o ponto está dentro do triângulo, ele está do mesmo lado
+    em relação a todas as arestas — sinais iguais. Zero significa
+    colinear (na aresta), que o enunciado exclui.
+    Usei has_neg e has_pos como booleanos separados para deixar
+    a lógica explícita: se tem os dois, o ponto está fora.
+
+================================================================

@@ -1,0 +1,95 @@
+================================================================
+                  CPP MODULE 02 — CONCEITOS APRENDIDOS
+================================================================
+
+----------------------------------------------------------------
+1. FORMA CANÔNICA ORTODOXA (Orthodox Canonical Class Form)
+----------------------------------------------------------------
+Toda classe que gerencia recursos deve ter os quatro membros:
+
+    class Foo {
+        Foo();                          // construtor padrão
+        Foo(const Foo& other);          // construtor de cópia
+        Foo& operator=(const Foo& rhs); // operador de atribuição
+        ~Foo();                         // destrutor
+    };
+
+Sem eles, o compilador gera versões rasas (shallow copy) que
+podem causar bugs ao copiar objetos com ponteiros ou recursos.
+
+----------------------------------------------------------------
+2. OPERADORES SOBRECARREGADOS (Operator Overloading)
+----------------------------------------------------------------
+Em C++ é possível definir o comportamento de operadores
+(+, -, *, /, <, >, ==, <<, ++, etc.) para tipos criados por você.
+
+    Fixed Fixed::operator+(const Fixed& rhs) const {
+        Fixed result;
+        result._rawBits = _rawBits + rhs._rawBits;
+        return result;
+    }
+
+Operadores de comparação devem retornar bool.
+Operadores aritméticos retornam um novo objeto (por valor).
+operator<< para ostream é definido fora da classe (função livre).
+
+----------------------------------------------------------------
+3. INCREMENTO PRÉ E PÓS (++ / --)
+----------------------------------------------------------------
+Pré-incremento (++a): incrementa e retorna o próprio objeto.
+Pós-incremento (a++): salva cópia, incrementa, retorna a cópia.
+
+    Fixed& operator++(void);       // pré — retorna *this por referência
+    Fixed  operator++(int);        // pós — parâmetro int é dummy para distinguir
+
+----------------------------------------------------------------
+4. PONTO FIXO (Fixed-Point Numbers)
+----------------------------------------------------------------
+Representa números fracionários sem usar float nativo.
+Guarda um inteiro onde os últimos N bits são a parte fracionária.
+
+    static const int _fractBits = 8;  // 8 bits para a fração
+
+    int → rawBits:    n << 8   (equivale a n * 256)
+    float → rawBits:  roundf(f * 256)
+    rawBits → float:  rawBits / 256.0f
+    rawBits → int:    rawBits >> 8
+
+Vantagens: velocidade (operações inteiras), determinismo.
+Desvantagem: precisão limitada pela quantidade de bits fracionários.
+
+----------------------------------------------------------------
+5. CAST ESTÁTICO (static_cast)
+----------------------------------------------------------------
+Conversão explícita de tipo verificada em tempo de compilação.
+
+    static_cast<float>(_rawBits) / (1 << _fractBits)
+    static_cast<long long>(_rawBits) * other._rawBits
+
+Preferível a cast estilo C pois é mais seguro e legível.
+Long long é necessário na multiplicação para evitar overflow antes
+de deslocar o resultado de volta.
+
+----------------------------------------------------------------
+6. MÉTODOS ESTÁTICOS COM SOBRECARGA (min / max)
+----------------------------------------------------------------
+Duas versões de min()/max(): uma para referências mutáveis e
+outra para referências const — permitem chamar em objetos const
+sem quebrar a constness.
+
+    static Fixed& min(Fixed& a, Fixed& b);
+    static const Fixed& min(const Fixed& a, const Fixed& b);
+
+----------------------------------------------------------------
+7. ALGORITMO BSP (Binary Space Partitioning)
+----------------------------------------------------------------
+Determina se um ponto está dentro de um triângulo usando o
+produto vetorial (cross product 2D) para cada aresta.
+
+    cross(P, A, B) = (Px-Bx)*(Ay-By) - (Ax-Bx)*(Py-By)
+
+Se os três resultados tiverem o mesmo sinal (todos positivos ou
+todos negativos), o ponto está dentro. Se algum for zero, o
+ponto está exatamente na aresta — fora pelo enunciado.
+
+================================================================

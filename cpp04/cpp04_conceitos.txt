@@ -1,0 +1,125 @@
+================================================================
+                  CPP MODULE 04 — CONCEITOS APRENDIDOS
+================================================================
+
+----------------------------------------------------------------
+1. FUNÇÕES VIRTUAIS (virtual)
+----------------------------------------------------------------
+Quando um método é marcado virtual na base, a versão chamada
+é determinada pelo tipo REAL do objeto (despacho dinâmico),
+não pelo tipo do ponteiro/referência.
+
+    class Animal {
+        virtual void makeSound() const;
+    };
+
+    Animal* a = new Cat();
+    a->makeSound();   // chama Cat::makeSound(), não Animal::makeSound()
+
+Sem virtual, chamaria sempre Animal::makeSound() mesmo apontando
+para um Cat — isso é o comportamento "errado" que WrongAnimal
+demonstra.
+
+----------------------------------------------------------------
+2. DESTRUTOR VIRTUAL
+----------------------------------------------------------------
+Se uma classe tem funções virtuais, o destrutor também deve
+ser virtual. Caso contrário, deletar via ponteiro para base
+chama apenas o destrutor da base — vazamento do destrutor
+da derivada.
+
+    class Animal {
+        virtual ~Animal();  // obrigatório quando há herança
+    };
+
+    Animal* a = new Cat();
+    delete a;   // sem virtual: só ~Animal() — vaza ~Cat()
+                // com virtual: ~Cat() → ~Animal() (correto)
+
+----------------------------------------------------------------
+3. POLIMORFISMO
+----------------------------------------------------------------
+Capacidade de tratar objetos de tipos diferentes de forma
+uniforme através de um ponteiro/referência para a base.
+
+    Animal* zoo[4];
+    zoo[0] = new Dog();
+    zoo[1] = new Cat();
+    for (int i = 0; i < 4; i++)
+        zoo[i]->makeSound();   // cada um faz seu som correto
+
+Permite escrever código genérico que funciona para subtipos
+futuros sem modificar o código existente.
+
+----------------------------------------------------------------
+4. CLASSE ABSTRATA E FUNÇÃO VIRTUAL PURA
+----------------------------------------------------------------
+Uma função virtual pura não tem implementação na base e
+OBRIGA as derivadas a implementá-la.
+
+    class Animal {
+        virtual void makeSound() const = 0;   // pura
+    };
+
+Animal vira classe abstrata — não pode ser instanciada.
+Qualquer derivada que não implemente makeSound() também se
+torna abstrata.
+
+----------------------------------------------------------------
+5. CÓPIA PROFUNDA (Deep Copy)
+----------------------------------------------------------------
+Quando uma classe tem ponteiros para objetos alocados no heap,
+o construtor de cópia e operator= precisam copiar os objetos
+apontados, não apenas os ponteiros (shallow copy copiaria só
+o endereço — dois objetos apontariam para o mesmo dado).
+
+    Brain::Brain(Brain const& other) {
+        for (int i = 0; i < 100; i++)
+            ideas[i] = other.ideas[i];  // copia os strings
+    }
+
+    // no operator= do Character:
+    _slots[i] = other._slots[i]->clone();  // cria nova cópia
+
+----------------------------------------------------------------
+6. INTERFACES (classe com apenas funções virtuais puras)
+----------------------------------------------------------------
+Interface = classe abstrata com todos os métodos puros virtuais
+e sem atributos. Define um contrato que as implementações devem
+cumprir.
+
+    class ICharacter {
+        virtual ~ICharacter() {}
+        virtual void equip(AMateria* m) = 0;
+        virtual void unequip(int idx) = 0;
+        virtual void use(int idx, ICharacter& target) = 0;
+    };
+
+Prefixo I por convenção para identificar interfaces.
+
+----------------------------------------------------------------
+7. MÉTODO clone() — PADRÃO PROTOTYPE
+----------------------------------------------------------------
+Permite duplicar um objeto sem saber seu tipo concreto.
+Cada classe concreta implementa clone() retornando uma nova
+instância de si mesma via new.
+
+    class Ice : public AMateria {
+        AMateria* clone() const { return new Ice(*this); }
+    };
+
+Permite que o Character copie Materias no operator= sem
+precisar saber qual tipo concreto cada slot contém.
+
+----------------------------------------------------------------
+8. GERENCIAMENTO DE MEMÓRIA COM PONTEIROS EM SLOTS
+----------------------------------------------------------------
+unequip() só nulifica o ponteiro — NÃO deleta o objeto.
+Isso exige que o chamador gerencie a memória do que foi
+desequipado (ou vaza).
+
+O destrutor e operator= deletam os slots antes de sair/reatribuir
+para evitar vazamento. No operator=, deletar antes de clonar
+garantia que não há leak mesmo se o objeto anterior tinha dados.
+
+================================================================

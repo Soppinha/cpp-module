@@ -1,0 +1,85 @@
+================================================================
+               CPP MODULE 03 — O QUE FIZ E POR QUÊ
+================================================================
+
+----------------------------------------------------------------
+EX00 — ClapTrap
+----------------------------------------------------------------
+O que fiz:
+    Classe ClapTrap com name, hitPoints (10), energyPoints (10),
+    attackDamage (0). Métodos: attack(), takeDamage(), beRepaired().
+    Forma canônica completa com logs no construtor/destrutor.
+
+Por que fiz assim:
+    Cada método verifica se hitPoints == 0 (morto) ou
+    energyPoints == 0 antes de agir — sem isso o robô realizaria
+    ações impossíveis. takeDamage() usa `amount >= _hitPoints`
+    para clamp em zero (evitar underflow em unsigned). Construtor
+    com nome e construtor padrão separados porque as classes
+    derivadas precisarão do construtor com nome.
+
+----------------------------------------------------------------
+EX01 — Serena, my love!  (ScavTrap)
+----------------------------------------------------------------
+O que fiz:
+    ScavTrap herda de ClapTrap. Construtor chama ClapTrap(name)
+    e depois sobrescreve os atributos herdados (HP=100, EP=50,
+    AD=20). Sobrecarrega attack() e adiciona guardGate().
+
+Por que fiz assim:
+    Chamar ClapTrap(name) na lista de inicialização garante que
+    _name é setado pelo construtor da base. Depois atribuir HP,
+    EP e AD no corpo substitui os valores padrão da base pelos
+    do ScavTrap — não é possível passá-los pelo construtor da
+    base sem modificar ClapTrap, o que o enunciado não pede.
+    attack() foi sobrescrita para imprimir "ScavTrap" em vez de
+    "ClapTrap" no log — identificação correta do robô.
+
+----------------------------------------------------------------
+EX02 — Repetitive class work... (FragTrap)
+----------------------------------------------------------------
+O que fiz:
+    FragTrap herda de ClapTrap. HP=100, EP=100, AD=30.
+    Adiciona highFivesGuys() que imprime um pedido de high-five.
+    Não sobrecarrega attack() — usa a da ClapTrap (ou sobrecarrega
+    com identificação FragTrap, depende da leitura do enunciado).
+
+Por que fiz assim:
+    Mesma estrutura do ScavTrap mas com atributos diferentes.
+    Manter a forma canônica com chamada ao operator= da base
+    no operator= da derivada evita duplicar a cópia dos campos
+    herdados.
+
+----------------------------------------------------------------
+EX03 — Diamond Problem (DiamondTrap)
+----------------------------------------------------------------
+O que fiz:
+    ScavTrap e FragTrap passaram a herdar de ClapTrap com
+    `virtual public` para evitar duplicação.
+
+    DiamondTrap herda de ambos e tem seu próprio _name.
+    Construtor passa name + "_clap_name" para ClapTrap (exigência
+    do enunciado), e usa os valores de HP do FragTrap e EP do
+    ScavTrap.
+
+    whoAmI() imprime os dois nomes (DiamondTrap._name e
+    ClapTrap::_name) para mostrar a dualidade.
+
+Por que fiz assim:
+    Sem `virtual` na herança de ClapTrap, DiamondTrap teria dois
+    subobjetos ClapTrap separados — ambiguidade e duplicação de
+    dados. Com herança virtual, há um único ClapTrap compartilhado,
+    e DiamondTrap precisa chamar ClapTrap() diretamente na sua
+    lista de inicialização (as chamadas em ScavTrap e FragTrap
+    são ignoradas neste caso).
+
+    Ter _name próprio em DiamondTrap enquanto ClapTrap::_name
+    recebe o sufixo "_clap_name" demonstra concretamente o que o
+    diamond problem causa: sem virtual, "qual _name usar?" seria
+    ambíguo.
+
+    whoAmI() usa ClapTrap::_name explicitamente para resolver a
+    ambiguidade — sem o escopo, _name se referiria ao da
+    DiamondTrap.
+
+================================================================

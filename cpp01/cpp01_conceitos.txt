@@ -1,0 +1,113 @@
+================================================================
+                  CPP MODULE 01 — CONCEITOS APRENDIDOS
+================================================================
+
+----------------------------------------------------------------
+1. ALOCAÇÃO DINÂMICA — new / delete
+----------------------------------------------------------------
+new aloca memória no heap e chama o construtor.
+delete libera a memória e chama o destrutor.
+
+    Zombie* z = new Zombie("Bob");   // heap
+    delete z;                         // obrigatório — senão vaza memória
+
+    Zombie* horde = new Zombie[N];   // array no heap
+    delete[] horde;                  // usa delete[] para arrays
+
+Objeto na stack: destruído automaticamente ao sair do escopo.
+Objeto no heap:  persiste até você chamar delete manualmente.
+
+----------------------------------------------------------------
+2. QUANDO USAR HEAP vs STACK
+----------------------------------------------------------------
+Stack → objeto local, vida curta, tamanho conhecido em compilação.
+Heap  → objeto que precisa sobreviver além do escopo atual,
+        tamanho definido em tempo de execução, ou quantidade
+        variável de objetos (horde de N zombies).
+
+----------------------------------------------------------------
+3. PONTEIROS vs REFERÊNCIAS
+----------------------------------------------------------------
+Ponteiro: variável que guarda um endereço. Pode ser nulo, pode
+          ser reatribuído, precisa de dereferência (*ptr).
+
+    std::string* ptr = &s;
+    *ptr = "novo valor";
+
+Referência: alias permanente para uma variável. Nunca nula,
+            não pode ser reatribuída para outro objeto.
+
+    std::string& ref = s;
+    ref = "novo valor";   // modifica s diretamente
+
+Regra prática:
+    Use referência quando o objeto sempre existe e não muda.
+    Use ponteiro quando pode ser nulo ou precisa ser reatribuído.
+
+----------------------------------------------------------------
+4. REFERÊNCIA vs PONTEIRO EM ATRIBUTOS DE CLASSE
+----------------------------------------------------------------
+HumanA tem Weapon como referência  → sempre tem uma arma,
+                                      obrigatória no construtor.
+HumanB tem Weapon como ponteiro    → pode não ter arma (nullptr),
+                                      pode ser atribuída depois.
+
+----------------------------------------------------------------
+5. FILE STREAMS — ifstream / ofstream
+----------------------------------------------------------------
+Para ler/escrever arquivos sem usar C puro.
+
+    std::ifstream in("arquivo.txt");   // abre para leitura
+    std::ofstream out("saida.txt");    // abre para escrita
+
+    std::string linha;
+    while (std::getline(in, linha)) { ... }   // lê linha a linha
+
+    in.close();
+    out.close();
+
+----------------------------------------------------------------
+6. STRING — BUSCA E SUBSTITUIÇÃO SEM str::replace
+----------------------------------------------------------------
+std::string::find(s, pos)  → retorna posição ou std::string::npos
+substr(pos, len)            → extrai parte da string
+
+Substituição manual: concatenar partes antes e depois de cada
+ocorrência em um loop — não usar std::string::replace.
+
+----------------------------------------------------------------
+7. PONTEIROS PARA FUNÇÕES MEMBRO
+----------------------------------------------------------------
+Tipo: ReturnType (ClassName::*varName)(Params)
+
+    void (Harl::*funcs[4])(void) = {
+        &Harl::debug,
+        &Harl::info,
+        &Harl::warning,
+        &Harl::error
+    };
+
+Chamada:
+    (this->*funcs[i])();
+
+Isso evita cadeias de if/else ou switch para despachar métodos
+baseados em string/índice.
+
+----------------------------------------------------------------
+8. SWITCH COM FALL-THROUGH
+----------------------------------------------------------------
+Sem break entre cases o código "cai" para o próximo case.
+Útil para acumular comportamento a partir de um nível mínimo.
+
+    switch (levelIndex) {
+        case 0: printDebug();
+        case 1: printInfo();
+        case 2: printWarning();
+        case 3: printError();
+            break;
+        default: std::cout << "[ Probably complaining about ...]";
+    }
+
+Ao entrar em case 1 (INFO), executa INFO + WARNING + ERROR.
+
+================================================================

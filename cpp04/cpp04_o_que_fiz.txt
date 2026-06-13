@@ -1,0 +1,87 @@
+================================================================
+               CPP MODULE 04 — O QUE FIZ E POR QUÊ
+================================================================
+
+----------------------------------------------------------------
+EX00 — Polymorphism
+----------------------------------------------------------------
+O que fiz:
+    Hierarquia Animal → Dog / Cat, todos com makeSound() virtual.
+    WrongAnimal → WrongCat com makeSound() NÃO virtual.
+    main() demonstra os dois comportamentos:
+    - Animal* a = new Cat() → a->makeSound() imprime "Meow!"
+    - WrongAnimal* w = new WrongCat() → w->makeSound() imprime "..."
+
+Por que fiz assim:
+    O propósito é mostrar o despacho dinâmico funcionando vs
+    não funcionando. Sem virtual, o compilador resolve o método
+    em tempo de compilação pelo tipo do ponteiro (Animal), nunca
+    chegando ao método da classe derivada (Cat).
+    O destrutor de Animal é virtual para garantir que `delete a`
+    chame ~Cat() antes de ~Animal().
+
+----------------------------------------------------------------
+EX01 — I don't want to set the world on fire
+----------------------------------------------------------------
+O que fiz:
+    Classe Brain com array de 100 std::string (ideias).
+    Cat e Dog agora têm um ponteiro Brain* alocado no heap.
+    Construtor de cópia e operator= de Cat/Dog fazem deep copy:
+    criam um Brain novo e copiam cada ideia individualmente.
+    Destrutor deleta o Brain.
+
+Por que fiz assim:
+    Se Cat copiasse apenas o ponteiro (shallow copy), dois gatos
+    diferentes apontariam para o mesmo Brain — deletar um
+    invalidaria o ponteiro do outro (use-after-free). A cópia
+    profunda garante que cada Cat tem seu próprio Brain
+    independente.
+    O array fixo de 100 strings no Brain é suficiente para o
+    exercício e evita alocação dinâmica adicional dentro do Brain.
+
+----------------------------------------------------------------
+EX02 — Abstract class
+----------------------------------------------------------------
+O que fiz:
+    Animal::makeSound() vira pura virtual (= 0), tornando Animal
+    abstrata — não pode ser instanciada diretamente.
+    Dog e Cat continuam implementando makeSound().
+
+Por que fiz assim:
+    Faz sentido semântico: um Animal genérico não faz som
+    definido — só os animais concretos (Dog, Cat) sabem o que
+    emitir. A classe abstrata impede instanciar `Animal a;` por
+    engano, que era um erro silencioso antes.
+
+----------------------------------------------------------------
+EX03 — Interface & recap
+----------------------------------------------------------------
+O que fiz:
+    AMateria: classe abstrata com tipo, clone() puro e use() puro.
+    Ice e Cure: derivadas concretas com clone() retornando new
+    da própria classe e use() com mensagem de efeito.
+    ICharacter e IMateriaSource: interfaces (só virtuais puras).
+    Character: implementa ICharacter com array de 4 slots (AMateria*).
+    MateriaSource: implementa IMateriaSource, aprende e cria Materias.
+
+Por que fiz assim:
+    clone() (padrão Prototype): Character::operator= pode copiar
+    cada slot sem saber o tipo concreto — chama clone() no ponteiro
+    base. Sem clone() precisaria de if/else para cada tipo.
+
+    unequip() não deleta: o enunciado especifica que o caller é
+    responsável pelo objeto desequipado. Deletar no unequip()
+    tornaria impossível guardar a materia antes de soltar o slot.
+
+    Character::operator= deleta slots antigos antes de clonar os
+    novos para não vazar memória na reatribuição.
+
+    MateriaSource guarda os templates aprendidos e no
+    createMateria() retorna clone() do template correspondente —
+    separação clara entre "aprender o tipo" e "criar instâncias".
+
+    Interfaces (ICharacter, IMateriaSource) permitem que o código
+    cliente dependa de contratos (interface), não de implementações
+    concretas — é o princípio de inversão de dependência no design.
+
+================================================================

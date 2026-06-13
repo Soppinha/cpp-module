@@ -1,0 +1,34 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   AMateria.cpp                                       :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: svaladar <svaladar@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/10 17:00:00 by svaladar          #+#    #+#             */
+/*   Updated: 2026/06/10 17:00:00 by svaladar         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "AMateria.hpp"
+#include <iostream>
+
+AMateria::AMateria(std::string const &type) : _type(type) {}
+
+AMateria::AMateria(AMateria const &other) : _type(other._type) {}
+
+AMateria &AMateria::operator=(AMateria const &other)
+{
+	if (this != &other)
+		_type = other._type;
+	return *this;
+}
+
+AMateria::~AMateria() {}
+
+std::string const &AMateria::getType() const { return _type; }
+
+void AMateria::use(ICharacter &target)
+{
+	(void)target;
+}

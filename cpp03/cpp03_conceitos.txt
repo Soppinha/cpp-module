@@ -1,0 +1,99 @@
+================================================================
+                  CPP MODULE 03 — CONCEITOS APRENDIDOS
+================================================================
+
+----------------------------------------------------------------
+1. HERANÇA (Inheritance)
+----------------------------------------------------------------
+Uma classe derivada herda atributos e métodos da classe base.
+
+    class ScavTrap : public ClapTrap { ... };
+
+public inheritance → a interface pública da base permanece
+                     pública na derivada (o mais comum).
+
+A derivada pode:
+    - Usar os membros herdados diretamente.
+    - Sobrescrever métodos da base (override).
+    - Adicionar novos métodos.
+
+----------------------------------------------------------------
+2. CADEIA DE CONSTRUTORES
+----------------------------------------------------------------
+O construtor da derivada chama o da base na lista de inicialização.
+Se não chamado explicitamente, o compilador chama o padrão.
+
+    ScavTrap::ScavTrap(std::string const& name) : ClapTrap(name)
+    {
+        _hitPoints    = 100;
+        _energyPoints = 50;
+        _attackDamage = 20;
+    }
+
+Ordem de construção: Base → Derivada
+Ordem de destruição: Derivada → Base (LIFO)
+
+----------------------------------------------------------------
+3. OVERRIDE DE MÉTODO
+----------------------------------------------------------------
+A derivada redefine um método da base com a mesma assinatura.
+Sem virtual na base, a versão chamada depende do tipo estático
+(tipo do ponteiro/referência), não do objeto real.
+
+    // ScavTrap redefine attack() de ClapTrap
+    void ScavTrap::attack(const std::string& target) { ... }
+
+----------------------------------------------------------------
+4. HERANÇA MÚLTIPLA
+----------------------------------------------------------------
+Uma classe pode herdar de mais de uma base ao mesmo tempo.
+
+    class DiamondTrap : public ScavTrap, public FragTrap { ... };
+
+Problema: se ScavTrap e FragTrap ambas herdam de ClapTrap,
+DiamondTrap teria DUAS cópias de ClapTrap — o Diamond Problem.
+
+----------------------------------------------------------------
+5. HERANÇA VIRTUAL (virtual inheritance)
+----------------------------------------------------------------
+Resolve o Diamond Problem: garante que exista apenas UMA
+instância da classe base compartilhada.
+
+    class ScavTrap : virtual public ClapTrap { ... };
+    class FragTrap : virtual public ClapTrap { ... };
+
+    class DiamondTrap : public ScavTrap, public FragTrap { ... };
+    // agora há apenas um ClapTrap dentro de DiamondTrap
+
+Com herança virtual, DiamondTrap é responsável por chamar o
+construtor de ClapTrap diretamente na sua própria lista de
+inicialização:
+
+    DiamondTrap::DiamondTrap(std::string const& name)
+        : ClapTrap(name + "_clap_name"), ScavTrap(name), FragTrap(name)
+
+----------------------------------------------------------------
+6. RESOLUÇÃO DE AMBIGUIDADE COM ::
+----------------------------------------------------------------
+Quando há ambiguidade entre herança múltipla, usa-se o operador
+de escopo para escolher qual versão usar.
+
+    _hitPoints    = FragTrap::_hitPoints;   // HP do FragTrap
+    _energyPoints = ScavTrap::_energyPoints; // EP do ScavTrap
+
+    ClapTrap::_name  // acessa o _name da subinstância ClapTrap
+
+----------------------------------------------------------------
+7. ENCADEAMENTO DE OPERADOR DE ATRIBUIÇÃO
+----------------------------------------------------------------
+A derivada chama o operator= da base para copiar os campos
+herdados, depois copia os seus próprios.
+
+    ScavTrap& ScavTrap::operator=(ScavTrap const& other)
+    {
+        if (this != &other)
+            ClapTrap::operator=(other);
+        return *this;
+    }
+
+================================================================

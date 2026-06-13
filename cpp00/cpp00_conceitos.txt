@@ -1,0 +1,117 @@
+================================================================
+                  CPP MODULE 00 — CONCEITOS APRENDIDOS
+================================================================
+
+----------------------------------------------------------------
+1. NAMESPACES
+----------------------------------------------------------------
+Agrupam nomes (funções, variáveis, classes) para evitar conflitos
+entre bibliotecas diferentes.
+
+    namespace Foo {
+        int valor = 42;
+    }
+    Foo::valor;  // acessa com ::
+
+"std" é o namespace da biblioteca padrão do C++.
+Por isso usamos std::cout, std::string, etc.
+
+----------------------------------------------------------------
+2. CLASSES E ENCAPSULAMENTO
+----------------------------------------------------------------
+Uma classe define atributos (dados) e métodos (ações).
+Encapsulamento é esconder detalhes internos com private/public.
+
+    class Conta {
+        private:
+            int _saldo;         // só a classe acessa
+        public:
+            int getSaldo() const;  // qualquer um acessa
+    };
+
+----------------------------------------------------------------
+3. MEMBROS ESTÁTICOS (static)
+----------------------------------------------------------------
+Pertencem à CLASSE, não a um objeto. São compartilhados entre
+todas as instâncias.
+
+    class Conta {
+        static int _totalContas;   // declaração no .hpp
+    };
+    int Conta::_totalContas = 0;   // definição obrigatória no .cpp
+
+Acesso: Conta::_totalContas (sem precisar de um objeto)
+
+----------------------------------------------------------------
+4. CONST EM MÉTODOS
+----------------------------------------------------------------
+Um método marcado como const não pode modificar o objeto.
+Obrigatório em getters — garante que você pode chamá-los em
+objetos const também.
+
+    int checkAmount() const;   // só lê, nunca modifica
+
+----------------------------------------------------------------
+5. GETTERS E SETTERS
+----------------------------------------------------------------
+Como atributos são private, métodos públicos expõem o acesso.
+
+    std::string getFirstName() const { return first_name; }
+    void setFirstName(const std::string& name) { first_name = name; }
+
+----------------------------------------------------------------
+6. LISTA DE INICIALIZAÇÃO
+----------------------------------------------------------------
+Forma eficiente de inicializar atributos no construtor.
+Preferível a atribuição no corpo do construtor.
+
+    Account::Account(int dep) : _amount(dep), _nbDeposits(0) {}
+
+A ordem na lista deve seguir a ordem de declaração na classe.
+
+----------------------------------------------------------------
+7. CONSTRUTOR E DESTRUTOR
+----------------------------------------------------------------
+Construtor: chamado automaticamente ao criar o objeto.
+Destrutor:  chamado automaticamente ao destruir o objeto.
+
+    class Foo {
+        Foo();   // construtor
+        ~Foo();  // destrutor (til antes do nome)
+    };
+
+----------------------------------------------------------------
+8. STREAMS DE I/O
+----------------------------------------------------------------
+C++ usa streams em vez de printf/scanf.
+
+    std::cout << "texto" << std::endl;   // saída padrão
+    std::cin  >> variavel;               // entrada (para no espaço)
+    std::getline(std::cin, variavel);    // lê linha inteira
+
+std::setw(N)   → define largura mínima de campo (requer <iomanip>)
+std::endl      → quebra de linha + flush do buffer
+"\n"           → só quebra de linha (mais rápido)
+
+----------------------------------------------------------------
+9. REFERÊNCIAS COMO PARÂMETROS
+----------------------------------------------------------------
+Passar por referência evita copiar o objeto inteiro.
+
+    void setNome(const std::string& nome);  // sem cópia, não modifica
+
+    std::string s      → cópia
+    std::string& s     → referência (pode modificar)
+    const std::string& s → referência somente leitura
+
+----------------------------------------------------------------
+10. INCLUDE GUARDS
+----------------------------------------------------------------
+Evitam que o mesmo header seja incluído mais de uma vez.
+
+    #ifndef MINHACLASSE_HPP
+    #define MINHACLASSE_HPP
+    // conteúdo
+    #endif
+
+================================================================

@@ -1,0 +1,121 @@
+================================================================
+               CPP MODULE 01 — O QUE FIZ E POR QUÊ
+================================================================
+
+----------------------------------------------------------------
+EX00 — BraiiiiiiinnnzzzZ (newZombie / randomChump)
+----------------------------------------------------------------
+O que fiz:
+    Classe Zombie com um nome, método announce() e destrutor
+    que imprime quando o zombie morre.
+    - newZombie(): cria zombie no heap com new, retorna ponteiro.
+    - randomChump(): cria zombie na stack (variável local).
+
+Por que fiz assim:
+    O ponto do exercício é mostrar a diferença de vida útil.
+    O zombie do heap sobrevive após a função retornar — por isso
+    pode ser anunciado e depois deletado manualmente no main().
+    O zombie da stack é destruído automaticamente ao sair de
+    randomChump(), por isso o destrutor imprime imediatamente.
+
+----------------------------------------------------------------
+EX01 — Zombie Horde
+----------------------------------------------------------------
+O que fiz:
+    zombieHorde() aloca N zombies com new Zombie[N] (array no
+    heap), chama setName() em cada um e retorna o ponteiro.
+    O main() os anuncia e chama delete[] horde.
+
+Por que fiz assim:
+    new[] e delete[] devem sempre ser usados juntos para arrays.
+    delete (sem []) chamaria o destrutor só do primeiro elemento
+    e causaria undefined behavior para o restante. Precisei de
+    setName() separado porque new[] chama o construtor padrão
+    (sem argumentos) em todos os elementos.
+
+----------------------------------------------------------------
+EX02 — HI THIS IS BRAIN
+----------------------------------------------------------------
+O que fiz:
+    Um programa simples que cria uma string, um ponteiro e uma
+    referência para ela, e imprime endereços e valores dos três.
+
+Por que fiz assim:
+    O objetivo era demonstrar que ponteiro e referência apontam
+    para o mesmo endereço da string original. Imprimir &s,
+    stringPTR e &stringREF mostra que os três endereços são
+    idênticos — referência não é uma cópia.
+
+----------------------------------------------------------------
+EX03 — Unnecessary Violence (HumanA / HumanB)
+----------------------------------------------------------------
+O que fiz:
+    Weapon com getType()/setType().
+    HumanA guarda Weapon como referência — inicializada no
+    construtor, sempre válida.
+    HumanB guarda Weapon como ponteiro — atribuída com
+    setWeapon(), pode ser nula.
+
+Por que fiz assim:
+    HumanA sempre tem uma arma desde a criação → referência é
+    a escolha certa (não pode ser nula, não muda de objeto).
+    HumanB pode não ter arma inicialmente → ponteiro permite
+    nullptr e permite atribuir depois com setWeapon().
+    Em attack(), os dois usam getType() da Weapon; como ambos
+    guardam um alias/ponteiro para o mesmo objeto, mudar o tipo
+    via setType() reflete imediatamente na próxima chamada a
+    attack() — esse é o comportamento esperado.
+
+----------------------------------------------------------------
+EX04 — Sed is for losers
+----------------------------------------------------------------
+O que fiz:
+    Abre o arquivo de entrada com ifstream, cria arquivo
+    de saída com nome + ".replace" usando ofstream.
+    Lê linha por linha com getline() e aplica replaceAll()
+    em cada linha antes de escrever.
+    replaceAll() usa string::find() em loop para substituir
+    todas as ocorrências de s1 por s2 sem usar std::replace.
+
+Por que fiz assim:
+    O enunciado proíbe std::string::replace, então construo
+    manualmente a string resultado concatenando substr() das
+    partes antes de cada ocorrência + s2. O loop com pos
+    avançando por s1.size() evita re-processar o que já foi
+    substituído (sem loop infinito se s2 contiver s1).
+    Usei firstLine para não escrever '\n' antes da primeira
+    linha — garante que o arquivo gerado não tem newline extra
+    no início.
+
+----------------------------------------------------------------
+EX05 — Harl 2.0
+----------------------------------------------------------------
+O que fiz:
+    Harl com 4 métodos (debug/info/warning/error).
+    complain() usa um array de ponteiros para funções membro
+    para despachar o método correto baseado no nível.
+
+Por que fiz assim:
+    Array de ponteiros para função membro elimina um if/else
+    longo. O loop percorre o array de strings de nível e ao
+    encontrar a correspondência chama (this->*funcs[i])(). É
+    O(N) mas legível e extensível — adicionar um nível novo
+    significa só adicionar nas duas arrays.
+
+----------------------------------------------------------------
+EX06 — Harl Filter
+----------------------------------------------------------------
+O que fiz:
+    Versão do Harl com switch + fall-through.
+    Um mapa string→índice encontra o índice do nível recebido
+    por argumento. O switch entra no case correto e, sem break,
+    executa todos os níveis a partir daí.
+
+Por que fiz assim:
+    Fall-through no switch é a forma idiomática de expressar
+    "a partir deste nível, mostra tudo". Evita duplicação de
+    código (não preciso chamar warning() e error() no case INFO
+    manualmente). O default trata nível desconhecido com
+    a mensagem solicitada pelo enunciado.
+
+================================================================
