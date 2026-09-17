@@ -2,94 +2,446 @@
                   CPP MODULE 02 — CONCEITOS APRENDIDOS
 ================================================================
 
+Este módulo gira em torno de UMA classe, Fixed, que evolui em
+três exercícios (ex00 → ex01 → ex02). Os conceitos abaixo estão
+organizados na ordem em que fazem mais sentido para entender essa
+evolução: primeiro a forma canônica (a base de qualquer classe em
+C++98), depois a representação de ponto fixo em si, depois as
+conversões implícitas, e por fim toda a sobrecarga de operadores
+que transforma Fixed num "tipo numérico" de verdade.
+
 ----------------------------------------------------------------
 1. FORMA CANÔNICA ORTODOXA (Orthodox Canonical Class Form)
 ----------------------------------------------------------------
-Toda classe que gerencia recursos deve ter os quatro membros:
+O QUE É:
+    É o conjunto mínimo de quatro membros que uma classe em C++98
+    "deve" declarar explicitamente: construtor padrão, construtor
+    de cópia, operator de atribuição (operator=) e destrutor. A
+    ideia é que qualquer classe que participe de cópias (passagem
+    por valor, retorno por valor, containers da STL) tenha um
+    comportamento de cópia bem definido, em vez de confiar apenas
+    no que o compilador geraria sozinho.
 
-    class Foo {
-        Foo();                          // construtor padrão
-        Foo(const Foo& other);          // construtor de cópia
-        Foo& operator=(const Foo& rhs); // operador de atribuição
-        ~Foo();                         // destrutor
-    };
+COMO FOI USADO:
+    Em cpp02/ex00/Fixed.hpp os quatro membros aparecem já na
+    primeira versão da classe:
 
-Sem eles, o compilador gera versões rasas (shallow copy) que
-podem causar bugs ao copiar objetos com ponteiros ou recursos.
+        Fixed();
+        Fixed(const Fixed &other);
+        Fixed &operator=(const Fixed &other);
+        ~Fixed();
+
+    E em Fixed.cpp cada um deles imprime uma mensagem de log
+    (ex00 exige isso para comprovar quando cada um é chamado):
+
+        Fixed::Fixed() : _rawBits(0)
+        {
+            std::cout << "Default constructor called" << std::endl;
+        }
+
+        Fixed::Fixed(const Fixed &other)
+        {
+            std::cout << "Copy constructor called" << std::endl;
+            *this = other;
+        }
+
+        Fixed &Fixed::operator=(const Fixed &other)
+        {
+            std::cout << "Copy assignment operator called" << std::endl;
+            if (this != &other)
+                _rawBits = other.getRawBits();
+            return *this;
+        }
+
+        Fixed::~Fixed()
+        {
+            std::cout << "Destructor called" << std::endl;
+        }
+
+    Nos ex01 e ex02, os quatro membros continuam presentes, mas
+    sem os logs (só o ex00 exige isso) e o corpo fica minimalista:
+
+        Fixed::Fixed(const Fixed &other) { *this = other; }
+
+        Fixed &Fixed::operator=(const Fixed &other)
+        {
+            if (this != &other)
+                _rawBits = other._rawBits;
+            return *this;
+        }
+
+POR QUE FOI FEITO ASSIM:
+    - O construtor de cópia delega para operator= em vez de
+      copiar _rawBits diretamente. Isso evita duplicar a lógica
+      de cópia em dois lugares: se no futuro a classe ganhasse
+      mais atributos, só operator= precisaria ser atualizado.
+    - O teste "if (this != &other)" em operator= protege contra
+      auto-atribuição (ex: a = a). Com um único int não faria
+      diferença prática, mas é o padrão correto a seguir: em
+      classes com ponteiros/recursos, pular esse teste pode
+      liberar memória do próprio objeto antes de copiá-la.
+    - Sem declarar esses quatro membros, o compilador gera
+      versões implícitas (shallow copy membro a membro). Para um
+      int isso até funcionaria, mas o módulo 02 exige a forma
+      explícita porque é ela que sustenta classes mais complexas
+      (com ponteiros, arrays alocados, etc.) que aparecem nos
+      módulos seguintes — o hábito é criado aqui.
+    - operator= retorna Fixed& (referência a *this) para permitir
+      encadeamento de atribuições, como em "a = b = c;", que é o
+      comportamento que os tipos primitivos já têm.
 
 ----------------------------------------------------------------
-2. OPERADORES SOBRECARREGADOS (Operator Overloading)
+2. PONTO FIXO (Fixed-Point Number Representation)
 ----------------------------------------------------------------
-Em C++ é possível definir o comportamento de operadores
-(+, -, *, /, <, >, ==, <<, ++, etc.) para tipos criados por você.
+O QUE É:
+    Ponto fixo é uma forma de representar números fracionários
+    usando apenas um inteiro, sem depender do hardware de ponto
+    flutuante. A ideia: reserva-se uma quantidade fixa de bits do
+    inteiro para representar a parte fracionária, e o restante
+    representa a parte inteira. O número "real" é sempre o valor
+    bruto (rawBits) dividido por 2^_fractBits.
 
-    Fixed Fixed::operator+(const Fixed& rhs) const {
-        Fixed result;
-        result._rawBits = _rawBits + rhs._rawBits;
-        return result;
-    }
+COMO FOI USADO:
+    Fixed.hpp (presente em ex00, ex01 e ex02) declara:
 
-Operadores de comparação devem retornar bool.
-Operadores aritméticos retornam um novo objeto (por valor).
-operator<< para ostream é definido fora da classe (função livre).
+        private:
+            int                 _rawBits;
+            static const int    _fractBits = 8;
 
-----------------------------------------------------------------
-3. INCREMENTO PRÉ E PÓS (++ / --)
-----------------------------------------------------------------
-Pré-incremento (++a): incrementa e retorna o próprio objeto.
-Pós-incremento (a++): salva cópia, incrementa, retorna a cópia.
+    8 bits de fração significam que a menor unidade representável
+    é 1/256. As conversões, em ex01/Fixed.cpp:
 
-    Fixed& operator++(void);       // pré — retorna *this por referência
-    Fixed  operator++(int);        // pós — parâmetro int é dummy para distinguir
+        Fixed::Fixed(const int n) : _rawBits(n << _fractBits) {}
 
-----------------------------------------------------------------
-4. PONTO FIXO (Fixed-Point Numbers)
-----------------------------------------------------------------
-Representa números fracionários sem usar float nativo.
-Guarda um inteiro onde os últimos N bits são a parte fracionária.
+        Fixed::Fixed(const float n)
+            : _rawBits(static_cast<int>(roundf(n * (1 << _fractBits)))) {}
 
-    static const int _fractBits = 8;  // 8 bits para a fração
+        float Fixed::toFloat(void) const
+        {
+            return static_cast<float>(_rawBits) / (1 << _fractBits);
+        }
 
-    int → rawBits:    n << 8   (equivale a n * 256)
-    float → rawBits:  roundf(f * 256)
-    rawBits → float:  rawBits / 256.0f
-    rawBits → int:    rawBits >> 8
+        int Fixed::toInt(void) const
+        {
+            return _rawBits >> _fractBits;
+        }
 
-Vantagens: velocidade (operações inteiras), determinismo.
-Desvantagem: precisão limitada pela quantidade de bits fracionários.
-
-----------------------------------------------------------------
-5. CAST ESTÁTICO (static_cast)
-----------------------------------------------------------------
-Conversão explícita de tipo verificada em tempo de compilação.
-
-    static_cast<float>(_rawBits) / (1 << _fractBits)
-    static_cast<long long>(_rawBits) * other._rawBits
-
-Preferível a cast estilo C pois é mais seguro e legível.
-Long long é necessário na multiplicação para evitar overflow antes
-de deslocar o resultado de volta.
-
-----------------------------------------------------------------
-6. MÉTODOS ESTÁTICOS COM SOBRECARGA (min / max)
-----------------------------------------------------------------
-Duas versões de min()/max(): uma para referências mutáveis e
-outra para referências const — permitem chamar em objetos const
-sem quebrar a constness.
-
-    static Fixed& min(Fixed& a, Fixed& b);
-    static const Fixed& min(const Fixed& a, const Fixed& b);
+POR QUE FOI FEITO ASSIM:
+    - "n << _fractBits" desloca os bits do inteiro 8 posições à
+      esquerda, o que equivale matematicamente a multiplicar por
+      256 — move o valor inteiro "n" para a região que representa
+      a parte inteira dentro do rawBits, deixando os 8 bits menos
+      significativos como parte fracionária (zerada, já que um
+      int não tem fração).
+    - "rawBits >> _fractBits" faz o inverso: descarta os 8 bits
+      fracionários e recupera a parte inteira, com truncamento
+      (não arredondamento) — é o comportamento esperado de toInt.
+    - Usar shifts de bits em vez de multiplicação/divisão por 256
+      é mais eficiente (embora com -O0 o compilador provavelmente
+      otimizaria de qualquer forma) e deixa explícito que se trata
+      de uma operação binária sobre a representação, e não uma
+      conta "matemática" qualquer.
+    - _fractBits é static const int: pertence à classe, não a
+      cada instância, e seu valor é fixado em tempo de compilação
+      — não faz sentido cada Fixed ter sua própria precisão.
+    - Vantagem do ponto fixo: operações determinísticas e sem os
+      problemas de arredondamento binário do float/double em
+      certas contas; desvantagem: alcance e precisão limitados
+      pelo número de bits reservados para a fração (aqui, 8 bits
+      cobrem só até 1/256 de resolução).
 
 ----------------------------------------------------------------
-7. ALGORITMO BSP (Binary Space Partitioning)
+3. CONSTRUTORES DE CONVERSÃO E CONVERSÃO IMPLÍCITA
 ----------------------------------------------------------------
-Determina se um ponto está dentro de um triângulo usando o
-produto vetorial (cross product 2D) para cada aresta.
+O QUE É:
+    Em C++, um construtor que aceita um único argumento (e não é
+    marcado "explicit") define uma conversão implícita: o
+    compilador pode usá-lo automaticamente sempre que um valor
+    daquele tipo for necessário onde se espera um objeto da
+    classe. Isso é o polimorfismo ad-hoc do módulo: o mesmo nome
+    de tipo (Fixed) "aceita" int e float através de construtores
+    diferentes, escolhidos por overload resolution.
 
-    cross(P, A, B) = (Px-Bx)*(Ay-By) - (Ax-Bx)*(Py-By)
+COMO FOI USADO:
+    Em ex01/Fixed.hpp aparecem dois construtores de conversão
+    além do padrão e do de cópia:
 
-Se os três resultados tiverem o mesmo sinal (todos positivos ou
-todos negativos), o ponto está dentro. Se algum for zero, o
-ponto está exatamente na aresta — fora pelo enunciado.
+        Fixed(const int n);
+        Fixed(const float n);
+
+    E no main.cpp do ex01:
+
+        Fixed const b(10);         // usa Fixed(const int)
+        Fixed const c(42.42f);     // usa Fixed(const float)
+        a = Fixed(1234.4321f);     // conversão explícita, mas o
+                                    // mecanismo é o mesmo construtor
+
+POR QUE FOI FEITO ASSIM:
+    - Ter dois construtores de um argumento (int e float) obriga
+      o compilador a escolher a sobrecarga certa a partir do tipo
+      do literal/variável passado — é exatamente o "ad-hoc
+      polymorphism" citado no enunciado do módulo: a mesma
+      operação (construir um Fixed) se comporta diferente
+      conforme o tipo d(e entrada.
+    - Os construtores não foram marcados como explicit porque o
+      enunciado do módulo pede que a conversão implícita funcione
+      (por exemplo, permitir std::cout << a.toInt() interagindo
+      naturalmente com literais, ou futuras contas mistas entre
+      Fixed e int/float sem cast manual).
+    - roundf() foi escolhido em vez de truncamento na conversão
+      float→Fixed para minimizar o erro de arredondamento: sem
+      round, 42.42f * 256 poderia truncar para o inteiro anterior
+      e perder ~1/256 de precisão sistematicamente.
+
+----------------------------------------------------------------
+4. OVERLOAD DE operator<< COMO FUNÇÃO LIVRE
+----------------------------------------------------------------
+O QUE É:
+    Sobrecarregar operator<< permite ensinar o std::ostream (cout,
+    stringstream, etc.) a imprimir um tipo definido pelo usuário
+    com a sintaxe natural "cout << objeto".
+
+COMO FOI USADO:
+    Declarado fora da classe em ex01/Fixed.hpp e ex02/Fixed.hpp:
+
+        std::ostream &operator<<(std::ostream &out, const Fixed &fixed);
+
+    Implementado em Fixed.cpp:
+
+        std::ostream &operator<<(std::ostream &out, const Fixed &fixed)
+        {
+            out << fixed.toFloat();
+            return out;
+        }
+
+    Usado em main.cpp: "std::cout << "a is " << a << std::endl;"
+
+POR QUE FOI FEITO ASSIM:
+    - operator<< PRECISA ser uma função livre (não-membro) porque
+      o objeto à esquerda do operador é o std::ostream, não um
+      Fixed. Se fosse membro de Fixed, a chamada exigiria a
+      sintaxe invertida "fixed << cout", o que não é o que se
+      quer imitar (o comportamento de cout << int, cout << float,
+      etc., onde o stream é sempre o operando esquerdo).
+    - A função não precisa e não deve ser friend aqui, porque
+      toFloat() já é uma função pública da classe — não há
+      necessidade de acessar _rawBits diretamente.
+    - Retorna std::ostream& para permitir encadeamento, como em
+      "cout << a << b << endl;", replicando o comportamento
+      padrão dos operadores de stream da biblioteca.
+    - Imprime toFloat() e não _rawBits diretamente, porque o
+      valor "visível" de um Fixed para quem usa a classe é o
+      número fracionário que ele representa, não sua codificação
+      interna.
+
+----------------------------------------------------------------
+5. OPERADORES DE COMPARAÇÃO (Relational Operators)
+----------------------------------------------------------------
+O QUE É:
+    Definir >, <, >=, <=, ==, != para um tipo definido pelo
+    usuário permite compará-lo com a mesma sintaxe de um tipo
+    primitivo.
+
+COMO FOI USADO:
+    Declarados em ex02/Fixed.hpp como métodos const que recebem
+    referência const:
+
+        bool operator>(const Fixed &other) const;
+        bool operator<(const Fixed &other) const;
+        bool operator>=(const Fixed &other) const;
+        bool operator<=(const Fixed &other) const;
+        bool operator==(const Fixed &other) const;
+        bool operator!=(const Fixed &other) const;
+
+    Implementados comparando diretamente o valor bruto:
+
+        bool Fixed::operator>(const Fixed &other) const { return _rawBits > other._rawBits; }
+        bool Fixed::operator==(const Fixed &other) const { return _rawBits == other._rawBits; }
+
+POR QUE FOI FEITO ASSIM:
+    - Todos retornam bool, porque semanticamente uma comparação
+      é uma pergunta de sim/não — é a mesma convenção usada pelos
+      operadores relacionais nativos da linguagem.
+    - São métodos const (o método em si não modifica o objeto) e
+      recebem "const Fixed &other" (não modificam o argumento e
+      evitam copiar o objeto passado) — isso também é o que
+      permite que essas comparações sejam chamadas dentro de
+      outros métodos const, como min()/max() da seção 8.
+    - Comparar diretamente _rawBits funciona porque a
+      representação de ponto fixo preserva a ordenação: se
+      rawBits(a) > rawBits(b), então o valor real de a também é
+      maior, já que ambos usam a mesma escala (_fractBits). Não é
+      necessário converter para float antes de comparar.
+
+----------------------------------------------------------------
+6. OPERADORES ARITMÉTICOS (+, -, *, /) E long long
+----------------------------------------------------------------
+O QUE É:
+    Sobrecarregar operadores aritméticos permite que Fixed some,
+    subtraia, multiplique e divida com a sintaxe "a + b", devolvendo
+    um novo Fixed (assim como int + int devolve um novo int).
+
+COMO FOI USADO:
+    Em ex02/Fixed.cpp:
+
+        Fixed Fixed::operator+(const Fixed &other) const
+        {
+            Fixed result;
+            result._rawBits = _rawBits + other._rawBits;
+            return result;
+        }
+
+        Fixed Fixed::operator*(const Fixed &other) const
+        {
+            Fixed result;
+            result._rawBits = static_cast<int>(
+                (static_cast<long long>(_rawBits) * other._rawBits) >> _fractBits);
+            return result;
+        }
+
+        Fixed Fixed::operator/(const Fixed &other) const
+        {
+            Fixed result;
+            result._rawBits = static_cast<int>(
+                (static_cast<long long>(_rawBits) << _fractBits) / other._rawBits);
+            return result;
+        }
+
+POR QUE FOI FEITO ASSIM:
+    - + e - operam direto em _rawBits, sem precisar de ajuste de
+      escala: somar dois valores já escalados por 2^8 dá
+      corretamente a soma escalada por 2^8 (soma é linear).
+    - * precisa de um ajuste que + e - não precisam: multiplicar
+      dois valores já escalados por 2^8 produz um resultado
+      escalado por 2^16 (2^8 * 2^8), então é preciso desfazer um
+      fator de escala extra com ">> _fractBits" depois de
+      multiplicar.
+    - / pelo motivo inverso precisa "adiantar" a escala: dividir
+      dois valores escalados por 2^8 cancela a escala (fica
+      escalado por 2^0), então antes de dividir desloca-se o
+      dividendo "<< _fractBits" para que o resultado final volte
+      a ficar escalado por 2^8.
+    - long long é usado como um cast intermediário exatamente
+      nesses dois casos (* e /) porque o produto/deslocamento
+      intermediário pode ultrapassar a faixa de um int de 32 bits
+      antes do ajuste de escala ser aplicado. Por exemplo, em
+      operator*, "_rawBits * other._rawBits" com dois rawBits
+      grandes pode facilmente estourar 2^31 mesmo que o resultado
+      final (depois do >> 8) caiba em int; fazer o cast para
+      long long antes de multiplicar evita esse overflow
+      intermediário. O mesmo raciocínio vale para o "<<
+      _fractBits" em operator/, que amplia o dividendo antes de
+      dividir.
+    - Todos retornam Fixed por valor (não por referência), porque
+      criam um objeto novo — não faria sentido retornar referência
+      para uma variável local "result" que deixa de existir ao
+      final da função (seria um caso de referência para lixo).
+    - São métodos const porque comparar/operar não deveria alterar
+      os operandos originais, só produzir um resultado novo.
+
+----------------------------------------------------------------
+7. INCREMENTO E DECREMENTO PRÉ / PÓS (++a vs a++)
+----------------------------------------------------------------
+O QUE É:
+    C++ permite sobrecarregar separadamente o incremento/
+    decremento prefixado (++a, --a) e o pós-fixado (a++, a--),
+    apesar de ambos usarem o mesmo símbolo de operador.
+
+COMO FOI USADO:
+    Declarados em ex02/Fixed.hpp:
+
+        Fixed &operator++(void);
+        Fixed operator++(int);
+        Fixed &operator--(void);
+        Fixed operator--(int);
+
+    Implementados em Fixed.cpp:
+
+        Fixed &Fixed::operator++(void)
+        {
+            _rawBits++;
+            return *this;
+        }
+
+        Fixed Fixed::operator++(int)
+        {
+            Fixed tmp(*this);
+            _rawBits++;
+            return tmp;
+        }
+
+POR QUE FOI FEITO ASSIM:
+    - A assinatura "operator++(int)" usa um parâmetro int que
+      nunca é de fato utilizado no corpo da função — ele existe
+      só como uma marca convencional da linguagem para permitir
+      ao compilador distinguir "operator++()" (pré) de
+      "operator++(int)" (pós) em tempo de compilação, já que os
+      dois têm o mesmo nome de operador.
+    - O pré-incremento retorna Fixed& (referência ao próprio
+      objeto já modificado), porque semanticamente "++a" É o
+      objeto "a" já incrementado — não há necessidade de copiar.
+    - O pós-incremento precisa retornar Fixed por valor (uma
+      cópia), porque semanticamente "a++" deve produzir o valor
+      de "a" ANTES do incremento, mesmo que "a" já tenha sido
+      modificado ao final da expressão. Por isso o corpo salva
+      "tmp(*this)" antes de incrementar e devolve tmp.
+    - Consequência de performance: o pós-incremento é sempre mais
+      caro que o pré, pois exige construir uma cópia extra — é
+      por isso que a convenção "prefira ++i a i++ quando o valor
+      antigo não for necessário" existe em C++ de forma geral.
+    - Cada um incrementa _rawBits diretamente (a menor unidade
+      representável na escala de 8 bits fracionários), e não o
+      valor "real" — incrementar em 1.0 exigiria somar 256 a
+      _rawBits, mas o enunciado pede que ++ incremente a unidade
+      mínima representável.
+
+----------------------------------------------------------------
+8. FUNÇÕES ESTÁTICAS min/max COM SOBRECARGA const/não-const
+----------------------------------------------------------------
+O QUE É:
+    Uma função membro static pertence à classe como um todo (não
+    a uma instância específica) e pode ser chamada sem precisar
+    de um objeto: Fixed::max(a, b). Aqui min/max aparecem
+    duplicados: uma versão para argumentos mutáveis e outra para
+    argumentos const.
+
+COMO FOI USADO:
+    Declarados em ex02/Fixed.hpp:
+
+        static Fixed       &min(Fixed &a, Fixed &b);
+        static const Fixed &min(const Fixed &a, const Fixed &b);
+        static Fixed       &max(Fixed &a, Fixed &b);
+        static const Fixed &max(const Fixed &a, const Fixed &b);
+
+    Implementados em Fixed.cpp:
+
+        Fixed &Fixed::min(Fixed &a, Fixed &b) { return (a < b) ? a : b; }
+        const Fixed &Fixed::min(const Fixed &a, const Fixed &b) { return (a < b) ? a : b; }
+
+    Usado em main.cpp: "std::cout << Fixed::max(a, b) << std::endl;"
+    onde "a" e "b" são objetos não-const, então a sobrecarga
+    não-const é escolhida automaticamente pelo compilador.
+
+POR QUE FOI FEITO ASSIM:
+    - O enunciado exige que min/max devolvam uma REFERÊNCIA a um
+      dos dois parâmetros originais (não uma cópia), tanto para
+      permitir modificar o vencedor pelo chamador quanto por
+      eficiência (evita copiar um Fixed desnecessariamente).
+    - Justamente por retornar referência, é preciso ter duas
+      sobrecargas: se só existisse a versão "Fixed&
+      min(Fixed&, Fixed&)", ela não poderia ser chamada com
+      argumentos const (violaria a garantia de que um objeto
+      const não pode ser exposto por uma referência não-const,
+      que permitiria modificá-lo indiretamente). A versão
+      "const Fixed& min(const Fixed&, const Fixed&)" existe
+      exatamente para cobrir esse caso, preservando a constness.
+    - O compilador escolhe automaticamente a sobrecarga certa por
+      overload resolution, com base na constness dos argumentos
+      passados na chamada — o código cliente não precisa se
+      preocupar com qual versão está sendo usada.
+    - Static faz sentido aqui porque min/max não pertencem
+      logicamente a "um" Fixed específico: são operações sobre
+      um PAR de valores, então chamá-las via Fixed::max(a, b), e
+      não a.max(b), é semanticamente mais correto.
 
 ================================================================

@@ -1,0 +1,21 @@
+obj/
+*.o
+*.replace
+
+# executáveis dos exercícios (sem extensão)
+cpp00/ex00/megaphone
+cpp00/ex01/my_amazing_phonebook
+cpp01/ex00/zombie
+cpp01/ex01/horde
+cpp01/ex03/violence
+cpp01/ex04/sed_replace
+cpp01/ex05/harl
+cpp02/ex00/fixed
+cpp02/ex01/fixed
+cpp02/ex02/fixed
+cpp03/ex00/claptrap
+cpp03/ex01/scavtrap
+cpp03/ex02/fragtrap
+cpp04/ex00/animal
+cpp04/ex01/animal
+cpp04/ex02/animal

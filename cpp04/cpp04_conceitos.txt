@@ -2,124 +2,368 @@
                   CPP MODULE 04 — CONCEITOS APRENDIDOS
 ================================================================
 
-----------------------------------------------------------------
-1. FUNÇÕES VIRTUAIS (virtual)
-----------------------------------------------------------------
-Quando um método é marcado virtual na base, a versão chamada
-é determinada pelo tipo REAL do objeto (despacho dinâmico),
-não pelo tipo do ponteiro/referência.
+Módulo 04: polimorfismo de subtipo, herança, classes abstratas.
+Exercícios usados como referência: ex00 (Polymorphism), ex01
+(Brain / deep copy), ex02 (Abstract class).
 
-    class Animal {
-        virtual void makeSound() const;
+----------------------------------------------------------------
+1. HERANÇA PÚBLICA (public inheritance)
+----------------------------------------------------------------
+O QUE É:
+    Mecanismo pelo qual uma classe derivada reaproveita a
+    interface e a implementação de uma classe base, estabelecendo
+    uma relação "é um" (is-a): um Dog É um Animal.
+
+COMO FOI USADO:
+    class Cat : public Animal          (cpp04/ex00/Cat.hpp:18)
+    class Dog : public Animal          (cpp04/ex00/Dog.hpp:18)
+
+    O construtor da derivada chama explicitamente o construtor
+    da base na lista de inicialização:
+
+        Cat::Cat() : Animal()          (cpp04/ex00/Cat.cpp:16)
+        {
+            _type = "Cat";
+            std::cout << "Cat constructor called" << std::endl;
+        }
+
+POR QUE FOI FEITO ASSIM:
+    Herdar publicamente deixa a interface de Animal (getType,
+    makeSound) acessível a quem manipula um Cat ou Dog como se
+    fossem Animal — é o que viabiliza o polimorfismo do item 2.
+    O atributo _type é protected em vez de private justamente
+    para que Cat/Dog possam atribuí-lo diretamente
+    (`_type = "Cat";`) sem precisar de um setter.
+
+----------------------------------------------------------------
+2. POLIMORFISMO DE SUBTIPO (via ponteiro/referência de base)
+----------------------------------------------------------------
+O QUE É:
+    Um ponteiro ou referência para a classe base pode apontar
+    para qualquer objeto de uma classe derivada, e a chamada de
+    um método virtual através dele executa a versão da classe
+    REAL do objeto, não a da classe do ponteiro. Isso permite
+    tratar tipos diferentes de forma uniforme.
+
+COMO FOI USADO:
+    const Animal *meta = new Animal();
+    const Animal *dog  = new Dog();
+    const Animal *cat  = new Cat();
+    ...
+    dog->makeSound();     // "Woof! Woof!"
+    cat->makeSound();     // "Meow! Meow!"
+    meta->makeSound();    // "..."
+        (cpp04/ex00/main.cpp:20-28)
+
+    E de forma mais evidente com um array de ponteiros de base
+    guardando tipos concretos diferentes:
+
+        Animal *animals[size];
+        for (int i = 0; i < size / 2; i++)
+            animals[i] = new Dog();
+        for (int i = size / 2; i < size; i++)
+            animals[i] = new Cat();
+        for (int i = 0; i < size; i++)
+        {
+            std::cout << animals[i]->getType() << ": ";
+            animals[i]->makeSound();
+        }
+            (cpp04/ex02/main.cpp:21-33)
+
+POR QUE FOI FEITO ASSIM:
+    O laço acima nem sabe, em tempo de compilação, se está lidando
+    com um Dog ou um Cat — só sabe que é um Animal. Isso é o que
+    permite escrever código genérico (a função que percorre o
+    array) que continuaria funcionando se amanhã existisse uma
+    classe Bird : public Animal, sem alterar uma linha do laço.
+    Sem despacho dinâmico, esse tipo de extensibilidade não
+    existiria: cada novo tipo exigiria um novo `if`/`switch`.
+
+----------------------------------------------------------------
+3. FUNÇÃO VIRTUAL vs NÃO-VIRTUAL (Animal vs WrongAnimal)
+----------------------------------------------------------------
+O QUE É:
+    `virtual` na base ativa o despacho dinâmico: a decisão de
+    qual override chamar é adiada para o tempo de execução,
+    consultando a vtable do objeto real. Sem `virtual`, a ligação
+    é estática: o compilador resolve a chamada usando o tipo
+    ESTÁTICO do ponteiro/referência (o tipo declarado), ignorando
+    o tipo real do objeto.
+
+COMO FOI USADO:
+    Caso CORRETO (Animal/Cat), makeSound é virtual:
+
+        virtual void	makeSound(void) const;
+            (cpp04/ex00/Animal.hpp:30)
+
+        void Cat::makeSound(void) const
+        {
+            std::cout << "Meow! Meow!" << std::endl;
+        }
+            (cpp04/ex00/Cat.cpp:39-42)
+
+    Caso ERRADO, de propósito, para contraste (WrongAnimal/
+    WrongCat), makeSound NÃO é virtual:
+
+        void		makeSound(void) const;
+            (cpp04/ex00/WrongAnimal.hpp:30, sem "virtual")
+
+        void WrongCat::makeSound(void) const
+        {
+            std::cout << "Mrrrow! (wrong)" << std::endl;
+        }
+            (cpp04/ex00/WrongCat.cpp:39-42)
+
+    E o teste no main que evidencia a diferença:
+
+        const WrongAnimal *wrongAnimal = new WrongAnimal();
+        const WrongAnimal *wrongCat   = new WrongCat();
+        wrongAnimal->makeSound();   // "..."
+        wrongCat->makeSound();      // "..."  (NÃO "Mrrrow!")
+            (cpp04/ex00/main.cpp:31-34)
+
+POR QUE FOI FEITO ASSIM:
+    wrongCat é do tipo `const WrongAnimal *`, mesmo apontando
+    para um WrongCat no heap. Como makeSound() não é virtual, o
+    compilador resolve a chamada em tempo de compilação olhando
+    só para o tipo do ponteiro (WrongAnimal) — por isso imprime
+    "..." em vez de "Mrrrow! (wrong)". Esse par de classes existe
+    exclusivamente para provar, lado a lado, por que `virtual` é
+    necessário sempre que se pretende polimorfismo: sem ele, a
+    herança ainda existe, mas o comportamento "certo" some
+    silenciosamente — não há erro de compilação, só resultado
+    errado, o que é pior porque passa despercebido.
+
+----------------------------------------------------------------
+4. DESTRUTOR VIRTUAL
+----------------------------------------------------------------
+O QUE É:
+    Quando uma classe tem funções virtuais e será usada
+    polimorficamente (deletada via ponteiro de base), seu
+    destrutor também precisa ser virtual. Isso garante que
+    `delete` através de um ponteiro de base execute a cadeia
+    completa de destrutores: primeiro o da classe derivada mais
+    específica, depois subindo até a base.
+
+COMO FOI USADO:
+    virtual ~Animal();          (cpp04/ex00/Animal.hpp:27)
+
+    Usado em:
+        const Animal *dog  = new Dog();
+        const Animal *cat  = new Cat();
+        ...
+        delete dog;
+        delete cat;
+            (cpp04/ex00/main.cpp:21,22,37,38)
+
+    Em WrongAnimal, o destrutor propositalmente NÃO é virtual:
+
+        ~WrongAnimal();          (cpp04/ex00/WrongAnimal.hpp:27)
+
+POR QUE FOI FEITO ASSIM:
+    Sem destrutor virtual, `delete dog` (onde dog é `Animal*`
+    apontando para um Dog) chamaria apenas ~Animal(), nunca
+    ~Dog(). No ex00 isso não vaza memória de forma grave porque
+    Dog não tem recursos próprios além dos herdados, mas a partir
+    do ex01, Dog e Cat passam a ter um ponteiro Brain* alocado no
+    heap — se ~Dog() não fosse chamado, o `delete _brain` dentro
+    dele nunca executaria, causando vazamento de memória real.
+    Além do leak, pular o destrutor da derivada é comportamento
+    indefinido sempre que ela mantém qualquer estado que precise
+    de limpeza. Por isso Animal declara `virtual ~Animal()` desde
+    o início, mesmo antes de existir o Brain — é uma regra geral:
+    toda classe base pensada para ser usada polimorficamente
+    (com métodos virtuais) deve ter destrutor virtual.
+
+----------------------------------------------------------------
+5. CLASSE ABSTRATA E MÉTODO VIRTUAL PURO (= 0)
+----------------------------------------------------------------
+O QUE É:
+    Uma função virtual pura é declarada com `= 0` e não tem
+    (necessariamente) implementação obrigatória na própria base.
+    Qualquer classe que contenha ao menos um método puro virtual
+    se torna abstrata: não pode ser instanciada diretamente, só
+    serve como base para outras classes. Uma classe derivada só
+    deixa de ser abstrata quando implementa TODOS os métodos
+    puros virtuais herdados.
+
+COMO FOI USADO:
+    No ex00 e ex01, makeSound() era virtual comum, com corpo:
+
+        virtual void	makeSound(void) const;
+            (cpp04/ex00/Animal.hpp:30 e ex01/Animal.hpp:30)
+
+    No ex02, vira pura virtual:
+
+        virtual void		makeSound(void) const = 0;
+            (cpp04/ex02/Animal.hpp:30)
+
+    E o main.cpp do ex02 documenta em comentário que isso quebra
+    a instanciação direta:
+
+        // Animal a; // nao compila: Animal e abstrata
+            (cpp04/ex02/main.cpp:19)
+
+    Dog e Cat continuam concretos porque implementam makeSound():
+
+        void Cat::makeSound(void) const { ... }
+            (cpp04/ex02/Cat.cpp:44-47)
+
+POR QUE FOI FEITO ASSIM:
+    Nos exercícios anteriores, `Animal::makeSound()` tinha um
+    corpo genérico (imprimir "...") que não fazia sentido
+    semântico — um "Animal" abstrato não emite nenhum som real,
+    só Dog e Cat sabem o que emitir. Deixar esse corpo vazio (ou
+    com um placeholder) permitiria por engano escrever
+    `Animal a;` em algum lugar do código e obter um objeto que
+    "funciona" mas não representa nada de concreto — um erro
+    silencioso. Tornar makeSound() pura virtual transforma esse
+    erro de design em erro de COMPILAÇÃO: o compilador impede
+    `new Animal()` ou `Animal a;` em qualquer lugar do programa,
+    forçando a modelagem correta (só tipos concretos existem).
+    Isso é o compilador aplicando uma regra de negócio em tempo
+    de compilação, em vez de depender de disciplina do programador.
+
+----------------------------------------------------------------
+6. COMPOSIÇÃO ("tem um") vs HERANÇA ("é um")
+----------------------------------------------------------------
+O QUE É:
+    Composição é quando uma classe guarda, como membro, um
+    ponteiro ou objeto de outra classe, formando uma relação
+    "tem um" — diferente da herança, que é "é um". No módulo,
+    Dog e Cat SÃO Animal (herança), mas cada um TEM um Brain
+    (composição).
+
+COMO FOI USADO:
+    class Cat : public Animal
+    {
+        private:
+            Brain	*_brain;
+        ...
     };
+        (cpp04/ex01/Cat.hpp:19-22)
 
-    Animal* a = new Cat();
-    a->makeSound();   // chama Cat::makeSound(), não Animal::makeSound()
+    Alocado no construtor:
 
-Sem virtual, chamaria sempre Animal::makeSound() mesmo apontando
-para um Cat — isso é o comportamento "errado" que WrongAnimal
-demonstra.
+        Cat::Cat() : Animal(), _brain(new Brain())
+            (cpp04/ex01/Cat.cpp:16)
 
-----------------------------------------------------------------
-2. DESTRUTOR VIRTUAL
-----------------------------------------------------------------
-Se uma classe tem funções virtuais, o destrutor também deve
-ser virtual. Caso contrário, deletar via ponteiro para base
-chama apenas o destrutor da base — vazamento do destrutor
-da derivada.
-
-    class Animal {
-        virtual ~Animal();  // obrigatório quando há herança
-    };
-
-    Animal* a = new Cat();
-    delete a;   // sem virtual: só ~Animal() — vaza ~Cat()
-                // com virtual: ~Cat() → ~Animal() (correto)
+POR QUE FOI FEITO ASSIM:
+    Brain não é um tipo de Animal nem se relaciona por
+    especialização — é um componente interno que Cat usa para
+    guardar suas "ideias". Modelar isso como herança
+    (`class Cat : public Animal, public Brain`) seria semanticamente
+    errado (um gato não É um cérebro) e violaria a regra de
+    herança múltipla desnecessária. Composição com ponteiro
+    (em vez de objeto Brain direto) foi escolhida para poder
+    controlar explicitamente o momento de alocação/cópia/
+    destruição do Brain, exercitando deep copy manual (item 7) —
+    se Brain fosse um membro por valor, o compilador já geraria
+    cópia membro-a-membro corretamente e o exercício perderia o
+    propósito didático.
 
 ----------------------------------------------------------------
-3. POLIMORFISMO
+7. CÓPIA PROFUNDA (Deep Copy) COM PONTEIRO MEMBRO
 ----------------------------------------------------------------
-Capacidade de tratar objetos de tipos diferentes de forma
-uniforme através de um ponteiro/referência para a base.
+O QUE É:
+    Quando uma classe tem um ponteiro para um objeto alocado no
+    heap, o construtor de cópia e o operator= gerados
+    automaticamente pelo compilador fariam uma cópia RASA
+    (shallow copy): copiariam apenas o valor do ponteiro (o
+    endereço), não o objeto apontado. Isso faz duas instâncias
+    apontarem para a MESMA área de memória. Deep copy significa
+    alocar um novo objeto e copiar o conteúdo, para que cada
+    instância tenha seu próprio dado independente.
 
-    Animal* zoo[4];
-    zoo[0] = new Dog();
-    zoo[1] = new Cat();
-    for (int i = 0; i < 4; i++)
-        zoo[i]->makeSound();   // cada um faz seu som correto
+COMO FOI USADO:
+    Construtor de cópia de Cat aloca um Brain NOVO, copiando o
+    conteúdo do Brain do original:
 
-Permite escrever código genérico que funciona para subtipos
-futuros sem modificar o código existente.
+        Cat::Cat(Cat const &other) : Animal(other), _brain(new Brain(*other._brain))
+        {
+            std::cout << "Cat copy constructor called" << std::endl;
+        }
+            (cpp04/ex01/Cat.cpp:22-25)
+
+    operator= deleta o Brain antigo antes de criar o novo:
+
+        Cat &Cat::operator=(Cat const &other)
+        {
+            if (this != &other)
+            {
+                Animal::operator=(other);
+                delete _brain;
+                _brain = new Brain(*other._brain);
+            }
+            return *this;
+        }
+            (cpp04/ex01/Cat.cpp:27-36)
+
+    E o próprio Brain implementa cópia campo-a-campo do array de
+    std::string (que já são copiados por valor por padrão):
+
+        Brain &Brain::operator=(Brain const &other)
+        {
+            if (this != &other)
+            {
+                for (int i = 0; i < 100; i++)
+                    ideas[i] = other.ideas[i];
+            }
+            return *this;
+        }
+            (cpp04/ex01/Brain.cpp:27-35)
+
+    O teste que prova que a cópia é independente:
+
+        Dog	original;
+        original.getBrain()->ideas[0] = "Chasing cars";
+        Dog copy(original);
+        copy.getBrain()->ideas[0] = "Eating food";
+        // original continua "Chasing cars", copy vira "Eating food"
+            (cpp04/ex01/main.cpp:28-36)
+
+POR QUE FOI FEITO ASSIM:
+    Se Cat::Cat(Cat const&) apenas copiasse o ponteiro
+    (`_brain(other._brain)`), original e copy compartilhariam o
+    mesmo Brain. Modificar copy.getBrain()->ideas[0] alteraria
+    também original — dado compartilhado indevidamente. Pior:
+    quando os dois destrutores rodassem, ambos chamariam
+    `delete _brain` sobre o MESMO endereço — double free, erro
+    fatal de memória (Undefined Behavior). `new Brain(*other._brain)`
+    resolve isso alocando um Brain totalmente separado.
+    No operator=, `delete _brain` antes de `_brain = new
+    Brain(...)` é necessário porque o objeto já existia (tinha um
+    Brain próprio alocado no construtor) — sem esse delete, o
+    Brain antigo vazaria (leak) ao ser sobrescrito pelo ponteiro
+    novo. A ordem importa: sempre deletar o antigo ANTES de
+    atribuir o novo ponteiro, senão perde-se a referência para
+    liberá-lo.
 
 ----------------------------------------------------------------
-4. CLASSE ABSTRATA E FUNÇÃO VIRTUAL PURA
+8. GERENCIAMENTO DE MEMÓRIA EM ARRAY DE PONTEIROS POLIMÓRFICOS
 ----------------------------------------------------------------
-Uma função virtual pura não tem implementação na base e
-OBRIGA as derivadas a implementá-la.
+O QUE É:
+    Quando objetos polimórficos são alocados dinamicamente e
+    guardados em um array de ponteiros de base, cada `new`
+    precisa de um `delete` correspondente, percorrendo o array.
 
-    class Animal {
-        virtual void makeSound() const = 0;   // pura
-    };
+COMO FOI USADO:
+    Animal *animals[size];
+    for (int i = 0; i < size / 2; i++)
+        animals[i] = new Dog();
+    for (int i = size / 2; i < size; i++)
+        animals[i] = new Cat();
+    ...
+    for (int i = 0; i < size; i++)
+        delete animals[i];
+        (cpp04/ex01/main.cpp:20-25,39-40 e ex02/main.cpp:21-27,35-36)
 
-Animal vira classe abstrata — não pode ser instanciada.
-Qualquer derivada que não implemente makeSound() também se
-torna abstrata.
-
-----------------------------------------------------------------
-5. CÓPIA PROFUNDA (Deep Copy)
-----------------------------------------------------------------
-Quando uma classe tem ponteiros para objetos alocados no heap,
-o construtor de cópia e operator= precisam copiar os objetos
-apontados, não apenas os ponteiros (shallow copy copiaria só
-o endereço — dois objetos apontariam para o mesmo dado).
-
-    Brain::Brain(Brain const& other) {
-        for (int i = 0; i < 100; i++)
-            ideas[i] = other.ideas[i];  // copia os strings
-    }
-
-    // no operator= do Character:
-    _slots[i] = other._slots[i]->clone();  // cria nova cópia
-
-----------------------------------------------------------------
-6. INTERFACES (classe com apenas funções virtuais puras)
-----------------------------------------------------------------
-Interface = classe abstrata com todos os métodos puros virtuais
-e sem atributos. Define um contrato que as implementações devem
-cumprir.
-
-    class ICharacter {
-        virtual ~ICharacter() {}
-        virtual void equip(AMateria* m) = 0;
-        virtual void unequip(int idx) = 0;
-        virtual void use(int idx, ICharacter& target) = 0;
-    };
-
-Prefixo I por convenção para identificar interfaces.
-
-----------------------------------------------------------------
-7. MÉTODO clone() — PADRÃO PROTOTYPE
-----------------------------------------------------------------
-Permite duplicar um objeto sem saber seu tipo concreto.
-Cada classe concreta implementa clone() retornando uma nova
-instância de si mesma via new.
-
-    class Ice : public AMateria {
-        AMateria* clone() const { return new Ice(*this); }
-    };
-
-Permite que o Character copie Materias no operator= sem
-precisar saber qual tipo concreto cada slot contém.
-
-----------------------------------------------------------------
-8. GERENCIAMENTO DE MEMÓRIA COM PONTEIROS EM SLOTS
-----------------------------------------------------------------
-unequip() só nulifica o ponteiro — NÃO deleta o objeto.
-Isso exige que o chamador gerencie a memória do que foi
-desequipado (ou vaza).
-
-O destrutor e operator= deletam os slots antes de sair/reatribuir
-para evitar vazamento. No operator=, deletar antes de clonar
-garantia que não há leak mesmo se o objeto anterior tinha dados.
+POR QUE FOI FEITO ASSIM:
+    `delete animals[i]` funciona corretamente e chama o
+    destrutor certo (~Dog() ou ~Cat(), depois ~Animal()) porque
+    ~Animal() é virtual (item 4) — reforça na prática por que
+    esse detalhe importa: sem destrutor virtual, esse laço de
+    limpeza vazaria o Brain de cada Dog/Cat alocado, mesmo
+    parecendo código de cleanup correto à primeira vista.
 
 ================================================================

@@ -102,20 +102,4 @@ Por que fiz assim:
     O(N) mas legível e extensível — adicionar um nível novo
     significa só adicionar nas duas arrays.
 
-----------------------------------------------------------------
-EX06 — Harl Filter
-----------------------------------------------------------------
-O que fiz:
-    Versão do Harl com switch + fall-through.
-    Um mapa string→índice encontra o índice do nível recebido
-    por argumento. O switch entra no case correto e, sem break,
-    executa todos os níveis a partir daí.
-
-Por que fiz assim:
-    Fall-through no switch é a forma idiomática de expressar
-    "a partir deste nível, mostra tudo". Evita duplicação de
-    código (não preciso chamar warning() e error() no case INFO
-    manualmente). O default trata nível desconhecido com
-    a mensagem solicitada pelo enunciado.
-
 ================================================================

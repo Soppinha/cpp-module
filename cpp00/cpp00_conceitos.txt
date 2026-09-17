@@ -1,117 +1,596 @@
 ================================================================
                   CPP MODULE 00 — CONCEITOS APRENDIDOS
 ================================================================
+Baseado no código real de ex00 (Megaphone) e ex01 (Phonebook).
+Cada seção explica O QUE é o conceito, ONDE ele aparece no meu
+código (arquivo:linha) e POR QUE foi feito daquele jeito.
 
 ----------------------------------------------------------------
-1. NAMESPACES
+1. NAMESPACES E std::
 ----------------------------------------------------------------
-Agrupam nomes (funções, variáveis, classes) para evitar conflitos
-entre bibliotecas diferentes.
+O QUE:
+    Namespace é um "sobrenome" para nomes (funções, classes,
+    variáveis) que evita colisão entre bibliotecas diferentes.
+    Sem eles, duas bibliotecas que definissem "cout" ou "string"
+    entrariam em conflito.
 
-    namespace Foo {
-        int valor = 42;
-    }
-    Foo::valor;  // acessa com ::
+COMO usei:
+    Em todo lugar: std::cout, std::cin, std::string, std::endl,
+    std::getline, std::setw. "std" é o namespace da biblioteca
+    padrão do C++.
 
-"std" é o namespace da biblioteca padrão do C++.
-Por isso usamos std::cout, std::string, etc.
+    Exemplo (main.cpp:22-23, ex01):
+        std::cout << "Type one of the following - ADD | SEARCH | EXIT: ";
+        std::getline(std::cin, command);
 
-----------------------------------------------------------------
-2. CLASSES E ENCAPSULAMENTO
-----------------------------------------------------------------
-Uma classe define atributos (dados) e métodos (ações).
-Encapsulamento é esconder detalhes internos com private/public.
-
-    class Conta {
-        private:
-            int _saldo;         // só a classe acessa
-        public:
-            int getSaldo() const;  // qualquer um acessa
-    };
-
-----------------------------------------------------------------
-3. MEMBROS ESTÁTICOS (static)
-----------------------------------------------------------------
-Pertencem à CLASSE, não a um objeto. São compartilhados entre
-todas as instâncias.
-
-    class Conta {
-        static int _totalContas;   // declaração no .hpp
-    };
-    int Conta::_totalContas = 0;   // definição obrigatória no .cpp
-
-Acesso: Conta::_totalContas (sem precisar de um objeto)
+POR QUE assim:
+    Poderia ter posto "using namespace std;" no topo dos arquivos
+    para escrever só "cout" e "cin". Não fiz isso porque
+    "using namespace std" no escopo global polui o namespace
+    inteiro — em projetos maiores isso pode causar ambiguidade
+    (por exemplo se eu criar minha própria classe "String" ou
+    função "count"). Escrever std:: explicitamente deixa claro
+    de onde vem cada símbolo e é a prática recomendada.
 
 ----------------------------------------------------------------
-4. CONST EM MÉTODOS
+2. INCLUDE GUARDS
 ----------------------------------------------------------------
-Um método marcado como const não pode modificar o objeto.
-Obrigatório em getters — garante que você pode chamá-los em
-objetos const também.
+O QUE:
+    Diretivas de pré-processador que impedem que o conteúdo de um
+    header seja colado mais de uma vez na mesma unidade de
+    compilação (o que geraria erro de redefinição de classe).
 
-    int checkAmount() const;   // só lê, nunca modifica
+COMO usei:
+    Contact.hpp:13-14 e 41:
+        #ifndef CONTACT_HPP
+        #define CONTACT_HPP
+        ...
+        #endif
 
-----------------------------------------------------------------
-5. GETTERS E SETTERS
-----------------------------------------------------------------
-Como atributos são private, métodos públicos expõem o acesso.
+    Igual em PhoneBook.hpp com PHONEBOOK_HPP.
 
-    std::string getFirstName() const { return first_name; }
-    void setFirstName(const std::string& name) { first_name = name; }
-
-----------------------------------------------------------------
-6. LISTA DE INICIALIZAÇÃO
-----------------------------------------------------------------
-Forma eficiente de inicializar atributos no construtor.
-Preferível a atribuição no corpo do construtor.
-
-    Account::Account(int dep) : _amount(dep), _nbDeposits(0) {}
-
-A ordem na lista deve seguir a ordem de declaração na classe.
-
-----------------------------------------------------------------
-7. CONSTRUTOR E DESTRUTOR
-----------------------------------------------------------------
-Construtor: chamado automaticamente ao criar o objeto.
-Destrutor:  chamado automaticamente ao destruir o objeto.
-
-    class Foo {
-        Foo();   // construtor
-        ~Foo();  // destrutor (til antes do nome)
-    };
+POR QUE assim:
+    PhoneBook.hpp inclui Contact.hpp, e main.cpp inclui
+    PhoneBook.hpp. Se Contact.hpp fosse incluído por engano duas
+    vezes na mesma cadeia de includes (o que é fácil de acontecer
+    conforme o projeto cresce), o compilador tentaria declarar a
+    classe Contact duas vezes e falharia. O nome da macro segue a
+    convenção NOMEDOARQUIVO_HPP em maiúsculas justamente para
+    nunca colidir com outra macro do projeto.
 
 ----------------------------------------------------------------
-8. STREAMS DE I/O
+3. CLASSES E ENCAPSULAMENTO (private / public)
 ----------------------------------------------------------------
-C++ usa streams em vez de printf/scanf.
+O QUE:
+    Uma classe agrupa dados (atributos) e comportamento (métodos).
+    Encapsulamento é o princípio de esconder os detalhes internos
+    e expor só o necessário, através de private e public.
 
-    std::cout << "texto" << std::endl;   // saída padrão
-    std::cin  >> variavel;               // entrada (para no espaço)
-    std::getline(std::cin, variavel);    // lê linha inteira
+COMO usei:
+    Contact.hpp:20-38 — todos os 5 atributos são private
+    (first_name, last_name, nickname, phone_number,
+    darkest_secret) e só os getters/setters são public.
 
-std::setw(N)   → define largura mínima de campo (requer <iomanip>)
-std::endl      → quebra de linha + flush do buffer
-"\n"           → só quebra de linha (mais rápido)
+    PhoneBook.hpp:22-24 — contact_list e count também são
+    private; só addContact() e searchContact() são public.
+
+POR QUE assim:
+    Se os atributos fossem public, qualquer parte do programa
+    poderia alterar o phone_number de um Contact sem passar por
+    nenhuma validação, ou zerar o "count" do PhoneBook e
+    corromper a lógica de slots. Deixando tudo private eu
+    garanto que a única forma de mudar um Contact é via setX(),
+    que é onde eu controlaria validações no futuro. É o mesmo
+    motivo de PhoneBook não expor contact_list diretamente: quem
+    usa a classe (main.cpp) só conhece "addContact" e
+    "searchContact", nunca manipula o array cru.
 
 ----------------------------------------------------------------
-9. REFERÊNCIAS COMO PARÂMETROS
+4. CONSTRUTOR E LISTA DE INICIALIZAÇÃO
 ----------------------------------------------------------------
-Passar por referência evita copiar o objeto inteiro.
+O QUE:
+    O construtor é chamado automaticamente na criação do objeto.
+    A lista de inicialização (depois dos dois-pontos, antes do
+    corpo) inicializa os atributos diretamente, em vez de
+    atribuir valores dentro do corpo do construtor.
 
-    void setNome(const std::string& nome);  // sem cópia, não modifica
+COMO usei:
+    PhoneBook.cpp:16:
+        PhoneBook::PhoneBook() : count(0) {}
 
-    std::string s      → cópia
-    std::string& s     → referência (pode modificar)
-    const std::string& s → referência somente leitura
+    Chamado implicitamente em main.cpp:17:
+        PhoneBook phonebook;
+
+POR QUE assim:
+    "count(0)" na lista de inicialização constrói o int já com
+    valor 0. Se eu tivesse escrito:
+        PhoneBook::PhoneBook() { count = 0; }
+    o efeito seria o mesmo para um int simples, mas para tipos
+    mais complexos (como std::string ou classes) a atribuição no
+    corpo primeiro constrói o membro com o construtor padrão e
+    DEPOIS atribui um novo valor — trabalho duplicado. A lista de
+    inicialização evita essa segunda passada e é o único jeito de
+    inicializar referências, atributos const e membros sem
+    construtor padrão. Contact não precisou de construtor
+    próprio porque std::string já tem construtor padrão (string
+    vazia) e isso é suficiente para o exercício.
 
 ----------------------------------------------------------------
-10. INCLUDE GUARDS
+5. DESTRUTOR IMPLÍCITO
 ----------------------------------------------------------------
-Evitam que o mesmo header seja incluído mais de uma vez.
+O QUE:
+    Destrutor é chamado automaticamente quando o objeto sai de
+    escopo ou é destruído. Se a classe não declarar um, o
+    compilador gera um destrutor padrão que destrói cada membro
+    na ordem inversa da declaração.
 
-    #ifndef MINHACLASSE_HPP
-    #define MINHACLASSE_HPP
-    // conteúdo
-    #endif
+COMO usei:
+    Nem Contact nem PhoneBook declaram destrutor. O gerado pelo
+    compilador é suficiente: ele chama o destrutor de cada
+    std::string dentro de Contact, e depois o destrutor de cada
+    Contact dentro do array contact_list[8] do PhoneBook.
+
+POR QUE assim:
+    Nenhuma das duas classes aloca memória com "new" ou segura
+    outro recurso manual (arquivo, ponteiro cru, etc.). Não há
+    nada extra para liberar, então declarar um destrutor vazio
+    (~Contact(){}) seria código redundante. A regra prática é:
+    só escrevo destrutor customizado quando a classe possui um
+    recurso que precisa ser liberado manualmente.
+
+----------------------------------------------------------------
+6. CONST EM MÉTODOS (getters)
+----------------------------------------------------------------
+O QUE:
+    Um método marcado com "const" depois da lista de parâmetros
+    promete não modificar nenhum atributo do objeto. O compilador
+    barra qualquer atribuição a membros dentro dele.
+
+COMO usei:
+    Contact.hpp:28-32, todos os getters:
+        std::string getFirstName() const;
+        std::string getLastName() const;
+        std::string getNickName() const;
+        std::string getPhoneNumber() const;
+        std::string getDarkestSecret() const;
+
+    Implementados em Contact.cpp:15-38, por exemplo:
+        std::string Contact::getFirstName() const
+        {
+            return first_name;
+        }
+
+POR QUE assim:
+    Getter só lê, nunca deveria escrever. Marcar como const é
+    tanto documentação (quem lê a assinatura já sabe que é
+    seguro chamar sem efeitos colaterais) quanto uma trava do
+    compilador contra erro de digitação (por exemplo escrever
+    "first_name = x" dentro do getter por engano). Além disso,
+    só métodos const podem ser chamados em objetos const ou em
+    referências const — em searchContact() eu recebo
+    "Contact &contact_obj" e chamo getFirstName() nela
+    (PhoneBook.cpp:102); se o getter não fosse const, eu não
+    poderia chamá-lo caso a referência fosse "const Contact&".
+
+----------------------------------------------------------------
+7. GETTERS E SETTERS
+----------------------------------------------------------------
+O QUE:
+    Como os atributos são private, métodos públicos "getX" e
+    "setX" controlam a leitura e a escrita deles.
+
+COMO usei:
+    Contact.hpp:34-38 declara 5 setters:
+        void setFirstName(const std::string& first);
+        void setLastName(const std::string& last);
+        void setNickname(const std::string& nick);
+        void setPhoneNumber(const std::string& number);
+        void setDarkestSecret(const std::string& secret);
+
+    Usados em PhoneBook.cpp:43,46,49,52,55 dentro de
+    addContact(), por exemplo:
+        contact_list[slot].setFirstName(input);
+
+POR QUE assim:
+    Um setter por campo, em vez de um construtor com 5
+    parâmetros, porque addContact() precisa ler os campos um de
+    cada vez (com validação de campo vazio no meio) antes de
+    montar o Contact completo — não dá para ter todos os 5
+    valores prontos ao mesmo tempo para passar num construtor
+    único. Os getters existem porque searchContact() (em outra
+    classe) precisa ler os dados de um Contact para exibi-los,
+    mas não deveria ter acesso direto aos atributos private.
+
+----------------------------------------------------------------
+8. REFERÊNCIAS COMO PARÂMETROS
+----------------------------------------------------------------
+O QUE:
+    Passar por referência (&) evita copiar o valor inteiro ao
+    chamar uma função. "const T&" é referência somente leitura:
+    tão eficiente quanto uma referência normal, mas com a
+    garantia de que a função não vai alterar o argumento.
+
+COMO usei:
+    Setters recebem "const std::string&" (Contact.hpp:34-38):
+        void setFirstName(const std::string& first);
+
+    readField() em PhoneBook.cpp:25 recebe DUAS referências,
+    uma const e uma não-const:
+        static void readField(const std::string &prompt, std::string &out)
+
+    E em searchContact() (PhoneBook.cpp:101):
+        Contact &contact_obj = contact_list[index - 1];
+
+POR QUE assim:
+    Em setFirstName, "const std::string&" evita copiar a string
+    inteira (que pode ter qualquer tamanho) só para ler seu
+    conteúdo — passar por valor copiaria, passar por referência
+    não. Em readField, "out" precisa ser "std::string&" SEM
+    const de propósito: a função escreve o resultado da leitura
+    diretamente na variável do chamador, então ela precisa
+    poder modificá-la. Se eu tivesse retornado a string por
+    valor em vez de usar referência de saída, teria funcionado
+    também, mas usar referência deixa explícito na assinatura
+    que a função tem esse efeito colateral (preencher "out") e
+    evita uma cópia extra no retorno. Em "Contact &contact_obj"
+    a referência evita copiar o Contact inteiro (5 strings) só
+    para ler seus campos.
+
+----------------------------------------------------------------
+9. FUNÇÕES ESTÁTICAS DE ARQUIVO (static fora de classe)
+----------------------------------------------------------------
+O QUE:
+    "static" aplicado a uma função no escopo de arquivo (fora de
+    qualquer classe) dá a ela ligação interna: a função só existe
+    e é visível dentro daquele .cpp, não pode ser chamada de
+    outro arquivo mesmo que ele declare o mesmo protótipo.
+    (Isso é diferente de "static" em membro de classe, que faz o
+    membro pertencer à classe em vez de a cada objeto — conceito
+    que não apareceu neste módulo porque não usei atributos
+    static em nenhuma classe.)
+
+COMO usei:
+    PhoneBook.cpp:18 e 25:
+        static std::string truncate(std::string s)
+        static void readField(const std::string &prompt, std::string &out)
+
+POR QUE assim:
+    truncate() e readField() são detalhes de implementação de
+    PhoneBook.cpp — nenhuma outra parte do programa precisa
+    chamá-las. Marcá-las como static evita que elas apareçam no
+    linker global e entrem em conflito caso eu criasse outra
+    função "truncate" em outro .cpp do mesmo projeto. A
+    alternativa seria transformá-las em métodos private de
+    PhoneBook, mas como não dependem de nenhum atributo da
+    classe (não usam "this"), funções static de arquivo são mais
+    simples e deixam a interface da classe (PhoneBook.hpp) mais
+    enxuta.
+
+----------------------------------------------------------------
+10. ARRAYS DE TAMANHO FIXO
+----------------------------------------------------------------
+O QUE:
+    Um array de tamanho fixo (T nome[N]) reserva espaço para N
+    elementos do tipo T, alocado direto no objeto (sem heap).
+
+COMO usei:
+    PhoneBook.hpp:23:
+        Contact contact_list[8];
+
+    Percorrido com índice em PhoneBook.cpp:75-81 e acessado
+    via "contact_list[slot]" em addContact() (linha 40-43).
+
+POR QUE assim:
+    O enunciado do exercício pede explicitamente um máximo de 8
+    contatos, então um array de tamanho fixo é a estrutura mais
+    direta — não preciso de alocação dinâmica (new/delete) nem
+    de std::vector (que também não seria permitido nas regras da
+    42 para este módulo). A desvantagem é que a capacidade fica
+    travada em 8 para sempre; a lógica de "slot = count % 8"
+    (seção 12) é o preço que se paga por essa simplicidade: em
+    vez de recusar o 9º contato, ele sobrescreve o mais antigo.
+
+----------------------------------------------------------------
+11. std::string
+----------------------------------------------------------------
+O QUE:
+    std::string é o tipo de string da biblioteca padrão do C++,
+    com tamanho dinâmico e vários métodos prontos (comparação,
+    concatenação, substr, length, etc.), diferente de char* do C.
+
+COMO usei:
+    Todos os atributos de Contact são std::string (Contact.hpp:
+    21-25). Uso de método de string em PhoneBook.cpp:20-21:
+        if (s.length() > 10)
+            return s.substr(0, 9) + ".";
+
+POR QUE assim:
+    Em ex00 (Megaphone) trabalhei com char* (argv) porque o
+    enunciado trata os argumentos como vinham do C (ver seção
+    14). Já em ex01, os dados dos contatos são textos de tamanho
+    variável fornecidos pelo usuário, então std::string é a
+    escolha certa: comparar strings com "==" (main.cpp:24,30,36),
+    concatenar com "+" e cortar com substr() seriam muito mais
+    verbosos e propensos a erro de memória se fossem feitos com
+    char* e funções de <cstring>.
+
+----------------------------------------------------------------
+12. CASTS: (char) vs static_cast<char>
+----------------------------------------------------------------
+O QUE:
+    Cast é a conversão explícita de um tipo para outro. C++
+    aceita o cast estilo C "(tipo)valor" (herdado do C) mas
+    também oferece static_cast<tipo>(valor), mais seguro porque
+    é verificado em tempo de compilação e deixa a intenção
+    explícita no código.
+
+COMO usei:
+    megaphone.cpp:28:
+        std::cout << (char)std::toupper(av[i][j]);
+
+POR QUE assim:
+    std::toupper (de <cctype>) recebe e devolve um int (para
+    poder representar EOF), então o resultado precisa ser
+    convertido de volta para char antes de ir para o cout —
+    caso contrário o cout imprimiria o número, não o caractere.
+    Usei o cast estilo C "(char)" por ser mais direto para uma
+    conversão numérica simples; static_cast<char>(...) faria
+    exatamente a mesma coisa e é considerado mais idiomático em
+    C++ porque, em conversões mais arriscadas (como remover
+    const ou converter ponteiros de classes não relacionadas),
+    static_cast barra o que não faz sentido em tempo de
+    compilação, enquanto o cast estilo C aceita silenciosamente
+    quase qualquer coisa. Para este caso específico (int → char)
+    o resultado é idêntico; a troca seria só de estilo/clareza.
+
+----------------------------------------------------------------
+13. std::toupper E <cctype>
+----------------------------------------------------------------
+O QUE:
+    std::toupper converte um caractere minúsculo para maiúsculo
+    (e devolve o próprio caractere se já não for minúsculo ou
+    não for letra). Vem do header <cctype>, herdado do C
+    (<ctype.h>).
+
+COMO usei:
+    megaphone.cpp:14 (include) e linha 28:
+        std::cout << (char)std::toupper(av[i][j]);
+
+POR QUE assim:
+    toupper trabalha caractere a caractere (recebe um int, não
+    uma string inteira), por isso precisei iterar manualmente
+    sobre cada char de cada argumento em vez de chamar uma
+    função que já devolvesse a string toda maiúscula — o C++98
+    não tem esse helper pronto para std::string. Isso também
+    explica por que usei char* (av[i]) em vez de std::string
+    aqui: os argumentos já chegam em main como char** (é a
+    assinatura padrão de main), então não havia necessidade de
+    convertê-los para std::string só para depois quebrar de
+    novo em caracteres individuais.
+
+----------------------------------------------------------------
+14. ARGUMENTOS DE main E LOOPS ANINHADOS
+----------------------------------------------------------------
+O QUE:
+    "int main(int ac, char **av)" recebe a quantidade de
+    argumentos (ac) e um vetor de strings estilo C (av), onde
+    av[0] é o nome do programa. Loops aninhados são um loop
+    dentro de outro, usados quando é preciso percorrer duas
+    dimensões (aqui: argumentos e, dentro de cada um, caracteres).
+
+COMO usei:
+    megaphone.cpp:16 e 25-29:
+        int main (int ac, char **av)
+        ...
+        for (int i = 1; i < ac; i++)
+        {
+            for (int j = 0; av[i][j]; j++)
+                std::cout << (char)std::toupper(av[i][j]);
+        }
+
+POR QUE assim:
+    O loop externo começa em i=1 (não em 0) para pular av[0], que
+    é o nome do executável, não um argumento do usuário. O loop
+    interno usa "av[i][j]" como condição de parada em vez de um
+    contador com strlen(): strings C são terminadas em '\0', que
+    é falso em contexto booleano, então o loop para sozinho
+    quando encontra o fim da string, sem precisar calcular o
+    tamanho antes. Já em ex01, main usa "int main( void )"
+    (main.cpp:15) porque o Phonebook não recebe nada pela linha
+    de comando — toda a entrada vem interativamente via std::cin.
+
+----------------------------------------------------------------
+15. STREAMS DE I/O (cout, cin, getline, endl)
+----------------------------------------------------------------
+O QUE:
+    C++ usa streams (fluxos) para entrada e saída em vez das
+    funções printf/scanf do C. std::cout envia para a saída
+    padrão, std::cin lê da entrada padrão.
+
+COMO usei:
+    Saída simples, megaphone.cpp:20:
+        std::cout << "* LOUD AND UNBEARABLE FEEDBACK NOISE *" << '\n';
+
+    Leitura de linha inteira, main.cpp:23 (ex01):
+        std::getline(std::cin, command);
+
+    Leitura de um único int, PhoneBook.cpp:86:
+        std::cin >> index;
+
+POR QUE assim:
+    std::getline() é usado para "command" e para cada campo do
+    contato porque nomes, apelidos e segredos podem ter espaços
+    ("João Silva"); "std::cin >> variavel" pararia no primeiro
+    espaço e cortaria o texto. Já o índice do contato
+    (PhoneBook.cpp:86) é lido com "std::cin >> index" porque ali
+    eu quero especificamente um número, e o operador >> já
+    ignora espaços em branco antes de ler e converte
+    automaticamente para int. Usei '\n' em vez de std::endl na
+    linha 20 de megaphone.cpp por ser a única saída do programa
+    (não há necessidade de forçar o flush do buffer no meio de
+    várias operações); já nas outras telas do Phonebook usei
+    std::endl repetidamente porque cada linha é exibida antes de
+    esperar uma nova entrada do usuário, e um endl garante que o
+    buffer é escrito na tela imediatamente antes do próximo
+    std::cin bloquear esperando input.
+
+----------------------------------------------------------------
+16. std::setw E <iomanip>
+----------------------------------------------------------------
+O QUE:
+    std::setw(N) formata a PRÓXIMA coisa impressa para ocupar no
+    mínimo N colunas, alinhando à direita por padrão. Precisa do
+    header <iomanip>. É um "manipulador de stream" que vale só
+    para a próxima inserção com <<.
+
+COMO usei:
+    PhoneBook.cpp:13 (include) e 70-80:
+        std::cout << std::setw(10) << "ID" << "|";
+        ...
+        std::cout << std::setw(10) << i + 1 << "|";
+        std::cout << std::setw(10) << truncate(contact_list[i].getFirstName()) << "|";
+
+POR QUE assim:
+    O enunciado exige que a tabela de contatos apareça com
+    colunas de largura fixa 10, alinhadas para ficar legível.
+    setw(10) precisa ser repetido antes de CADA campo (não é
+    "global" para a linha inteira) porque o manipulador só afeta
+    a próxima inserção — por isso ele aparece 4 vezes no
+    cabeçalho e 4 vezes em cada linha do laço. É por isso também
+    que truncate() (seção 17) existe: setw só garante largura
+    MÍNIMA, então um campo com mais de 10 caracteres estouraria
+    a coluna e desalinharia a tabela inteira se não fosse cortado
+    antes.
+
+----------------------------------------------------------------
+17. TRUNCAMENTO DE STRING (helper truncate)
+----------------------------------------------------------------
+O QUE:
+    Função auxiliar que corta uma string para caber num limite de
+    exibição, normalmente indicando que ela foi cortada com "...".
+
+COMO usei:
+    PhoneBook.cpp:18-23:
+        static std::string truncate(std::string s)
+        {
+            if (s.length() > 10)
+                return s.substr(0, 9) + ".";
+            return s;
+        }
+
+POR QUE assim:
+    O enunciado pede que campos maiores que 10 caracteres sejam
+    exibidos truncados com um ponto no final. Escrevi como
+    função livre (não como método de Contact nem de PhoneBook)
+    porque é puramente uma regra de EXIBIÇÃO da tabela — não é
+    responsabilidade do Contact saber como vai ser mostrado, nem
+    faz sentido acoplar essa lógica a PhoneBook além de chamá-la.
+    O parâmetro é recebido por valor (std::string s, sem &)
+    porque a função devolve uma string nova a cada chamada de
+    qualquer forma; não copiar a entrada não traria ganho real
+    aqui, já que sempre é feita ao menos uma cópia no retorno.
+
+----------------------------------------------------------------
+18. VALIDAÇÃO DE ENTRADA: cin.fail(), clear(), ignore()
+----------------------------------------------------------------
+O QUE:
+    Quando std::cin tenta ler um tipo (como int) e o usuário
+    digita algo que não é esse tipo, o stream entra em "estado de
+    falha": cin.fail() passa a retornar true e o stream para de
+    aceitar novas leituras até ser resetado com cin.clear().
+    cin.ignore(N, delim) descarta até N caracteres do buffer ou
+    até encontrar o caractere delim (o que vier primeiro).
+
+COMO usei:
+    PhoneBook.cpp:86-94:
+        std::cin >> index;
+        if (std::cin.fail())
+        {
+            std::cin.clear();
+            std::cin.ignore(1000, '\n');
+            std::cout << "Invalid ID." << std::endl;
+            return;
+        }
+        std::cin.ignore();
+
+POR QUE assim:
+    Se o usuário digitar uma letra em vez de um número no prompt
+    "Enter an ID:", cin >> index falha e "index" fica com um
+    valor indefinido, e o stream trava em estado de erro — todas
+    as leituras seguintes falhariam do mesmo jeito até eu limpar
+    esse estado. cin.clear() reseta as flags de erro; depois
+    cin.ignore(1000, '\n') descarta o lixo digitado (a linha
+    inteira, até 1000 caracteres ou até o '\n') para não deixá-lo
+    no buffer atrapalhando a próxima leitura. Já o
+    "std::cin.ignore()" sozinho na linha 94 (sem argumentos, só
+    para o caminho de sucesso) descarta o '\n' residual deixado
+    pelo ">> index" — sem isso, um std::getline() chamado logo
+    depois capturaria essa linha vazia em vez de esperar o
+    usuário digitar algo (esse mesmo cuidado está documentado em
+    cpp00_o_que_fiz.txt).
+
+----------------------------------------------------------------
+19. LÓGICA DE ÍNDICE CIRCULAR (count % 8)
+----------------------------------------------------------------
+O QUE:
+    Operador módulo (%) devolve o resto da divisão. Usado aqui
+    para "dar a volta" num array de tamanho fixo: quando o
+    contador ultrapassa o tamanho do array, o índice volta para 0.
+
+COMO usei:
+    PhoneBook.cpp:40:
+        int slot = count % 8;
+
+    E na exibição, PhoneBook.cpp:62:
+        int total = count < 8 ? count : 8;
+
+POR QUE assim:
+    O array contact_list tem exatamente 8 posições fixas (seção
+    10). Sem o módulo, o 9º contato causaria acesso fora dos
+    limites do array (undefined behavior). Com "count % 8", o
+    9º contato (count == 8) cai no slot 0 de novo, sobrescrevendo
+    o primeiro contato cadastrado — um comportamento circular
+    simples, sem precisar mover elementos nem alocar mais
+    memória. Por outro lado, "total" em searchContact() usa o
+    operador ternário para nunca mostrar mais que 8 linhas na
+    tabela mesmo que "count" já tenha passado de 8 (ele continua
+    contando todas as adições, não só as que cabem no array).
+
+----------------------------------------------------------------
+20. LOOP DE VALIDAÇÃO (readField)
+----------------------------------------------------------------
+O QUE:
+    Padrão de "ler e repetir enquanto inválido": um loop infinito
+    que só termina (via return ou break) quando a entrada atende
+    a uma condição.
+
+COMO usei:
+    PhoneBook.cpp:25-35:
+        static void readField(const std::string &prompt, std::string &out)
+        {
+            while (true)
+            {
+                std::cout << prompt;
+                std::getline(std::cin, out);
+                if (!out.empty())
+                    return;
+                std::cout << "Field cannot be empty." << std::endl;
+            }
+        }
+
+    Chamada 5 vezes em addContact() (PhoneBook.cpp:42-55), uma
+    para cada campo do contato.
+
+POR QUE assim:
+    O enunciado exige que nenhum campo seja salvo vazio.
+    Escrever essa validação como função reutilizável evita
+    repetir o mesmo "while(true) { ... }" cinco vezes dentro de
+    addContact() — um para first_name, outro para last_name, etc.
+    — que seria a mesma lógica copiada e colada 5 vezes. Ela
+    recebe o prompt como parâmetro (const std::string&, sem
+    cópia desnecessária) e escreve o resultado direto em "out"
+    por referência (seção 8), então addContact() só precisa
+    chamar readField() e usar a variável "input" preenchida logo
+    em seguida.
 
 ================================================================

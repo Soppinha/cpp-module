@@ -65,22 +65,4 @@ Por que fiz assim:
     produto de dois fica em ~2^46, que cabe em long long (64 bits)
     mas não em int (32 bits).
 
-----------------------------------------------------------------
-EX03 — BSP
-----------------------------------------------------------------
-O que fiz:
-    Classe Point com x e y do tipo Fixed (const — imutável).
-    bsp() recebe três vértices e um ponto e usa cross() para
-    calcular o produto vetorial em relação a cada aresta.
-    Retorna true só se todos os três sinais forem iguais E
-    nenhum for zero (ponto exatamente na aresta = falso).
-
-Por que fiz assim:
-    O produto vetorial 2D mede de que lado da reta o ponto está.
-    Se o ponto está dentro do triângulo, ele está do mesmo lado
-    em relação a todas as arestas — sinais iguais. Zero significa
-    colinear (na aresta), que o enunciado exclui.
-    Usei has_neg e has_pos como booleanos separados para deixar
-    a lógica explícita: se tem os dois, o ponto está fora.
-
 ================================================================

@@ -2,112 +2,518 @@
                   CPP MODULE 01 — CONCEITOS APRENDIDOS
 ================================================================
 
-----------------------------------------------------------------
-1. ALOCAÇÃO DINÂMICA — new / delete
-----------------------------------------------------------------
-new aloca memória no heap e chama o construtor.
-delete libera a memória e chama o destrutor.
-
-    Zombie* z = new Zombie("Bob");   // heap
-    delete z;                         // obrigatório — senão vaza memória
-
-    Zombie* horde = new Zombie[N];   // array no heap
-    delete[] horde;                  // usa delete[] para arrays
-
-Objeto na stack: destruído automaticamente ao sair do escopo.
-Objeto no heap:  persiste até você chamar delete manualmente.
+Este módulo gira em torno de memória (stack vs heap), das duas
+formas de "apontar" para um objeto (ponteiro e referência) e de
+como C++ permite guardar/despachar comportamento (ponteiros para
+função membro). Cada seção explica O QUE é o conceito, COMO ele
+aparece no meu código (ex00 a ex05) e POR QUE escolhi usá-lo
+daquela forma.
 
 ----------------------------------------------------------------
-2. QUANDO USAR HEAP vs STACK
+1. STACK vs HEAP — onde um objeto vive
 ----------------------------------------------------------------
-Stack → objeto local, vida curta, tamanho conhecido em compilação.
-Heap  → objeto que precisa sobreviver além do escopo atual,
-        tamanho definido em tempo de execução, ou quantidade
-        variável de objetos (horde de N zombies).
+O QUE:
+    Toda variável em C++ mora em algum lugar da memória. A stack
+    (pilha) guarda variáveis locais: alocação e liberação são
+    automáticas e seguem a ordem de entrada/saída de escopo. O
+    heap é uma região de memória gerenciada manualmente: o
+    programador pede espaço com new e é responsável por devolver
+    com delete.
 
-----------------------------------------------------------------
-3. PONTEIROS vs REFERÊNCIAS
-----------------------------------------------------------------
-Ponteiro: variável que guarda um endereço. Pode ser nulo, pode
-          ser reatribuído, precisa de dereferência (*ptr).
+COMO usei:
+    Em ex00/randomChump.cpp:
 
-    std::string* ptr = &s;
-    *ptr = "novo valor";
+        void randomChump(std::string name)
+        {
+            Zombie chump(name);
+            chump.announce();
+        }
 
-Referência: alias permanente para uma variável. Nunca nula,
-            não pode ser reatribuída para outro objeto.
+    "chump" é local a randomChump — vive na stack. Quando a
+    função retorna, o destrutor de Zombie roda sozinho e imprime
+    "<nome> is dead" imediatamente, sem eu precisar chamar nada.
 
-    std::string& ref = s;
-    ref = "novo valor";   // modifica s diretamente
+    Já em ex00/newZombie.cpp:
 
-Regra prática:
-    Use referência quando o objeto sempre existe e não muda.
-    Use ponteiro quando pode ser nulo ou precisa ser reatribuído.
+        Zombie* newZombie(std::string name)
+        {
+            return new Zombie(name);
+        }
 
-----------------------------------------------------------------
-4. REFERÊNCIA vs PONTEIRO EM ATRIBUTOS DE CLASSE
-----------------------------------------------------------------
-HumanA tem Weapon como referência  → sempre tem uma arma,
-                                      obrigatória no construtor.
-HumanB tem Weapon como ponteiro    → pode não ter arma (nullptr),
-                                      pode ser atribuída depois.
+    Aqui o Zombie é criado no heap. Ele sobrevive ao retorno da
+    função — por isso o main() consegue chamar
+    zombie_heap->announce() depois, e só é destruído quando eu
+    chamo delete explicitamente (main.cpp, linha 28).
 
-----------------------------------------------------------------
-5. FILE STREAMS — ifstream / ofstream
-----------------------------------------------------------------
-Para ler/escrever arquivos sem usar C puro.
-
-    std::ifstream in("arquivo.txt");   // abre para leitura
-    std::ofstream out("saida.txt");    // abre para escrita
-
-    std::string linha;
-    while (std::getline(in, linha)) { ... }   // lê linha a linha
-
-    in.close();
-    out.close();
+POR QUE:
+    O próprio exercício (BraiiiiiiinnnzzzZ) existe para deixar
+    essa diferença de vida útil bem visível: se eu tivesse
+    retornado o endereço de uma variável de stack de dentro de
+    randomChump, o objeto já teria sido destruído no momento em
+    que o ponteiro chegasse ao chamador — um ponteiro pendurado
+    (dangling pointer), que é undefined behavior. Usar heap em
+    newZombie é a forma correta de "exportar" um objeto para fora
+    da função que o criou.
 
 ----------------------------------------------------------------
-6. STRING — BUSCA E SUBSTITUIÇÃO SEM str::replace
+2. new / delete — alocação de um único objeto
 ----------------------------------------------------------------
-std::string::find(s, pos)  → retorna posição ou std::string::npos
-substr(pos, len)            → extrai parte da string
+O QUE:
+    new aloca memória no heap do tamanho do tipo pedido, chama o
+    construtor e devolve um ponteiro para o objeto construído.
+    delete chama o destrutor e devolve a memória ao sistema. Todo
+    new precisa de exatamente um delete correspondente — se eu
+    esquecer, o programa vaza memória (memory leak); se eu chamar
+    delete duas vezes no mesmo ponteiro, é undefined behavior
+    (double free).
 
-Substituição manual: concatenar partes antes e depois de cada
-ocorrência em um loop — não usar std::string::replace.
+COMO usei:
+    ex00/main.cpp:
+
+        Zombie* zombie_heap = newZombie(av[1]);
+        zombie_heap->announce();
+        randomChump(av[1]);
+        delete zombie_heap;
+
+    O delete só acontece depois de eu terminar de usar o
+    zombie_heap (announce()) — ordem importa, usar depois do
+    delete seria acessar memória já liberada (use-after-free).
+
+POR QUE:
+    Não dava para usar um objeto de stack aqui porque o ponto do
+    exercício era justamente comparar as duas vidas úteis lado a
+    lado no mesmo main(). O heap também é a escolha certa sempre
+    que o "dono" do objeto (quem decide quando ele morre) não é o
+    mesmo escopo que o criou — no ex00, quem decide quando o
+    zombie_heap morre é o main(), não a função newZombie.
 
 ----------------------------------------------------------------
-7. PONTEIROS PARA FUNÇÕES MEMBRO
+3. new[] / delete[] — alocação de arrays no heap
 ----------------------------------------------------------------
-Tipo: ReturnType (ClassName::*varName)(Params)
+O QUE:
+    Quando a quantidade de objetos só é conhecida em tempo de
+    execução (por exemplo, um N vindo de argumento), não dá para
+    declarar um array de tamanho fixo na stack. new[] aloca N
+    objetos contíguos no heap e chama o construtor padrão (sem
+    argumentos) em cada um deles. delete[] chama o destrutor de
+    cada elemento antes de liberar o bloco inteiro.
 
-    void (Harl::*funcs[4])(void) = {
-        &Harl::debug,
-        &Harl::info,
-        &Harl::warning,
-        &Harl::error
-    };
+COMO usei:
+    ex01/zombieHorde.cpp:
 
-Chamada:
-    (this->*funcs[i])();
+        Zombie* horde = new Zombie[N];
+        for (int i = 0; i < N; i++)
+            horde[i].setName(name);
+        return horde;
 
-Isso evita cadeias de if/else ou switch para despachar métodos
-baseados em string/índice.
+    Como new Zombie[N] não pode passar argumentos para o
+    construtor, precisei de um construtor padrão Zombie() em
+    ex01/Zombie.hpp (diferente do ex00, que só tinha o
+    construtor com parâmetro) e de um setName() separado para
+    inicializar cada zombie depois da alocação.
+
+    No main.cpp do ex01: delete[] horde; — nunca delete horde
+    sozinho.
+
+POR QUE:
+    Usar delete (sem colchetes) em um array chamaria o destrutor
+    apenas do primeiro elemento e ainda assim tentaria liberar o
+    bloco inteiro como se fosse um único objeto — undefined
+    behavior garantido, e nos outros N-1 zombies o destrutor
+    nunca rodaria. Por isso new[] e delete[] são um par
+    indissociável: usar um sem o outro é sempre bug. A alternativa
+    de alocar N Zombies separados com N chamadas a new dentro de
+    um loop funcionaria, mas geraria N alocações independentes em
+    vez de um bloco contíguo, complicando a liberação (precisaria
+    de um array de ponteiros) sem nenhum ganho — new[] resolve
+    isso em uma linha.
 
 ----------------------------------------------------------------
-8. SWITCH COM FALL-THROUGH
+4. PONTEIROS vs REFERÊNCIAS
 ----------------------------------------------------------------
-Sem break entre cases o código "cai" para o próximo case.
-Útil para acumular comportamento a partir de um nível mínimo.
+O QUE:
+    Ponteiro: uma variável que guarda um endereço de memória.
+    Pode ser nulo (NULL/0), pode ser reatribuído para apontar
+    para outro objeto, e para acessar o valor apontado é preciso
+    dereferenciar com *.
+    Referência: um apelido (alias) para uma variável já
+    existente. É obrigatoriamente inicializada na declaração,
+    nunca é nula e nunca passa a se referir a outro objeto — usar
+    o nome da referência é exatamente o mesmo que usar o nome do
+    objeto original.
 
-    switch (levelIndex) {
-        case 0: printDebug();
-        case 1: printInfo();
-        case 2: printWarning();
-        case 3: printError();
-            break;
-        default: std::cout << "[ Probably complaining about ...]";
-    }
+COMO usei:
+    ex02/main.cpp demonstra isso de forma direta:
 
-Ao entrar em case 1 (INFO), executa INFO + WARNING + ERROR.
+        std::string  s = "HI THIS IS BRAIN";
+        std::string* stringPTR = &s;
+        std::string& stringREF = s;
+
+        std::cout << "addr s   : " << &s << std::endl;
+        std::cout << "addr PTR : " << stringPTR << std::endl;
+        std::cout << "addr REF : " << &stringREF << std::endl;
+
+    Os três endereços impressos são idênticos — isso prova que
+    stringREF não é uma cópia de s, é literalmente outro nome
+    para a mesma variável. stringPTR guarda esse mesmo endereço,
+    mas como um valor que pode ser trocado (diferente de
+    stringREF).
+
+POR QUE:
+    Referência não existe para "economizar espaço" — em geral
+    ocupa o mesmo espaço que um ponteiro internamente. A vantagem
+    é semântica: o compilador garante que ela nunca é nula e
+    nunca aponta para outra coisa, o que elimina uma classe
+    inteira de bugs (checagem de NULL, reatribuição acidental).
+    Ponteiro é a ferramenta certa quando essa garantia não pode
+    ser dada — é exatamente o caso da seção 5.
+
+----------------------------------------------------------------
+5. ESCOLHENDO PONTEIRO OU REFERÊNCIA COMO ATRIBUTO DE CLASSE
+----------------------------------------------------------------
+O QUE:
+    A mesma decisão da seção 4, mas aplicada ao desenho de uma
+    classe: um atributo membro deve ser ponteiro ou referência
+    dependendo de se o objeto associado é opcional/substituível
+    ou obrigatório/fixo durante toda a vida do objeto dono.
+
+COMO usei:
+    ex03/HumanA.hpp guarda a arma como referência:
+
+        private:
+            std::string name;
+            Weapon& weapon;
+
+    e o construtor exige a arma:
+
+        HumanA::HumanA(std::string name, Weapon& weapon)
+            : name(name), weapon(weapon) {}
+
+    Não existe forma de criar um HumanA sem arma, e essa arma
+    nunca muda de objeto (só o tipo dela pode mudar via
+    setType()).
+
+    ex03/HumanB.hpp guarda a arma como ponteiro:
+
+        private:
+            std::string name;
+            Weapon* weapon;
+
+    inicializado como nulo no construtor:
+
+        HumanB::HumanB(std::string name) : name(name), weapon(NULL) {}
+
+    e HumanB::attack() precisa checar antes de usar:
+
+        if (!weapon)
+        {
+            std::cout << name << " has no weapon" << std::endl;
+            return;
+        }
+        std::cout << name << " attacks with their " << weapon->getType() << std::endl;
+
+    setWeapon() atribui depois da construção:
+
+        void HumanB::setWeapon(Weapon& weapon)
+        {
+            this->weapon = &weapon;
+        }
+
+POR QUE:
+    HumanA representa um humano que sempre nasce armado — usar
+    referência obriga isso a nível de compilador: é impossível
+    escrever HumanA sem passar uma Weapon& no construtor, e
+    attack() nunca precisa checar se a arma existe. HumanB
+    representa um humano que pode nascer desarmado e receber uma
+    arma depois — isso é exatamente o caso de uso de um ponteiro:
+    pode ser NULL e pode ser reatribuído com setWeapon(). Se eu
+    tivesse usado referência em HumanB, seria impossível
+    representar "sem arma" (referência não pode ser nula) e
+    impossível reatribuir depois da construção. Se eu tivesse
+    usado ponteiro em HumanA, perderia a garantia de que a arma
+    sempre existe e teria que adicionar checagens de nulo
+    desnecessárias em attack().
+
+    Um detalhe que o teste em ex03/main.cpp evidencia: como
+    ambos guardam um alias/ponteiro para o MESMO objeto Weapon
+    (não uma cópia), mudar o tipo da arma depois com
+    club.setType(...) se reflete na próxima chamada a attack()
+    sem eu precisar atualizar nada em HumanA/HumanB — reforça que
+    referência e ponteiro não copiam o objeto apontado, apenas
+    dão acesso a ele.
+
+----------------------------------------------------------------
+6. FILE STREAMS — ifstream / ofstream
+----------------------------------------------------------------
+O QUE:
+    <fstream> fornece std::ifstream (input, leitura de arquivo) e
+    std::ofstream (output, escrita de arquivo), que funcionam com
+    a mesma interface de streams de std::cin/std::cout — evitando
+    ter que usar fopen/fread/fwrite da lib C.
+
+COMO usei:
+    ex04/main.cpp:
+
+        std::ifstream inFile(filename.c_str());
+        if (!inFile.is_open())
+        { ... return 1; }
+
+        std::string outFilename = filename + ".replace";
+        std::ofstream outFile(outFilename.c_str());
+        if (!outFile.is_open())
+        { ... return 1; }
+
+        std::string line;
+        bool firstLine = true;
+        while (std::getline(inFile, line))
+        {
+            if (!firstLine)
+                outFile << "\n";
+            outFile << replaceAll(line, s1, s2);
+            firstLine = false;
+        }
+
+        inFile.close();
+        outFile.close();
+
+POR QUE:
+    is_open() depois de construir o stream é a forma de detectar
+    que o arquivo não existe ou não pôde ser aberto/criado, sem
+    isso o programa continuaria tentando ler/escrever em um
+    stream inválido silenciosamente. Uso getline() em vez de
+    operator>> porque preciso da linha inteira (incluindo
+    espaços), não só da próxima palavra. O firstLine é um detalhe
+    de correção: se eu sempre escrevesse "\n" antes da linha, o
+    arquivo de saída teria uma linha em branco extra no início;
+    escrevendo o "\n" antes de todas as linhas EXCETO a primeira,
+    reconstruo o arquivo com o mesmo número de linhas do
+    original, sem estruturar isso manualmente com contadores.
+    (Este projeto usa c++98, e como não usei std::string::c_str()
+    seria opcional em versões mais novas — mas nesse padrão
+    ifstream/ofstream aceitam tanto const char* quanto
+    std::string dependendo da implementação, então chamei
+    c_str() para ser explícita e portátil.)
+
+----------------------------------------------------------------
+7. BUSCA E SUBSTITUIÇÃO DE STRING SEM std::string::replace
+----------------------------------------------------------------
+O QUE:
+    std::string::find(sub, pos) procura a primeira ocorrência de
+    "sub" a partir da posição "pos" e retorna o índice encontrado
+    ou a constante std::string::npos se não encontrar nada.
+    substr(pos, len) extrai uma cópia de parte da string.
+    O enunciado do ex04 proíbe usar std::string::replace, então a
+    substituição de todas as ocorrências precisa ser feita
+    manualmente combinando find + substr.
+
+COMO usei:
+    ex04/main.cpp, replaceAll():
+
+        static std::string replaceAll(const std::string &line,
+                                       const std::string &s1,
+                                       const std::string &s2)
+        {
+            std::string result;
+            size_t pos = 0;
+
+            while (pos < line.size())
+            {
+                size_t found = line.find(s1, pos);
+                if (found == std::string::npos)
+                {
+                    result += line.substr(pos);
+                    break;
+                }
+                result += line.substr(pos, found - pos);
+                result += s2;
+                pos = found + s1.size();
+            }
+            return result;
+        }
+
+POR QUE:
+    Construo "result" concatenando pedaço a pedaço: o trecho
+    antes da ocorrência (substr(pos, found - pos)) + o texto de
+    substituição (s2), e avanço pos para logo depois do fim de s1
+    encontrado (found + s1.size()). Avançar por s1.size() — e não
+    por s2.size() — é o detalhe que evita loop infinito ou
+    substituição recursiva quando s2 contém s1 (por exemplo,
+    trocar "a" por "aa": se eu reprocessasse o texto já
+    substituído, o programa ficaria dobrando "a"s para sempre).
+    Quando find não encontra mais nada (npos), o restante da
+    linha inteira é copiado de uma vez com substr(pos) e o loop
+    termina — sem essa condição eu perderia o final da linha após
+    a última ocorrência de s1.
+
+----------------------------------------------------------------
+8. VALIDAÇÃO DE ARGUMENTOS E ERROS DE ENTRADA
+----------------------------------------------------------------
+O QUE:
+    Programas que recebem argumentos de linha de comando (argc/
+    argv) ou abrem arquivos externos não devem assumir que a
+    entrada é válida — precisam checar quantidade de argumentos,
+    valores vazios e resultado de operações de I/O antes de
+    seguir em frente, retornando um código de erro e uma mensagem
+    em std::cerr quando algo está errado.
+
+COMO usei:
+    ex00/main.cpp e ex01/main.cpp checam ac < 2 antes de acessar
+    av[1]:
+
+        if (ac < 2)
+            return 1;
+
+    ex01/main.cpp também confere se zombieHorde() de fato
+    retornou um ponteiro válido antes de usá-lo:
+
+        Zombie* horde = zombieHorde(5, av[1]);
+        if (!horde)
+            return 1;
+
+    ex04/main.cpp é o caso mais completo, com quatro checagens
+    em sequência: número de argumentos, s1 vazio, arquivo de
+    entrada aberto e arquivo de saída criado:
+
+        if (ac != 4) { std::cerr << "Usage: ..." << std::endl; return 1; }
+        if (s1.empty()) { std::cerr << "Error: s1 cannot be empty" << std::endl; return 1; }
+        if (!inFile.is_open()) { std::cerr << "Error: cannot open file '" << filename << "'" << std::endl; return 1; }
+        if (!outFile.is_open()) { std::cerr << "Error: cannot create file '" << outFilename << "'" << std::endl; return 1; }
+
+POR QUE:
+    Sem essas checagens, acessar av[1] com ac < 2 seria acesso
+    fora dos limites do array de argumentos (undefined behavior);
+    prosseguir com s1 vazio faria o replaceAll entrar em loop
+    infinito, porque line.find("", pos) sempre "encontra" a
+    string vazia na própria posição pos e o cursor nunca avança;
+    e escrever/ler em um ifstream/ofstream que falhou ao abrir
+    simplesmente não faz nada (silenciosamente), mascarando o
+    erro real. Uso std::cerr (não std::cout) para mensagens de
+    erro porque é a convenção correta: cerr é para diagnóstico,
+    não faz parte da saída "normal" do programa e não é
+    bufferizado da mesma forma, garantindo que a mensagem apareça
+    mesmo se o programa travar logo depois.
+
+----------------------------------------------------------------
+9. ENCAPSULAMENTO — GETTERS E SETTERS
+----------------------------------------------------------------
+O QUE:
+    Atributos privados só podem ser lidos/alterados por métodos
+    públicos da própria classe (getters e setters), em vez de
+    expor o atributo diretamente. Isso permite à classe controlar
+    como o valor é lido e modificado sem deixar o resto do
+    programa depender da representação interna.
+
+COMO usei:
+    ex03/Weapon.hpp:
+
+        private:
+            std::string type;
+        public:
+            const std::string& getType() const;
+            void setType(const std::string& type);
+
+    getType() retorna uma referência const — permite ler o tipo
+    sem copiar a string e sem permitir que quem chamou a
+    modifique diretamente. HumanA::attack() e HumanB::attack() só
+    enxergam weapon.getType(), nunca o atributo "type" em si.
+
+POR QUE:
+    Se "type" fosse público, qualquer código externo poderia
+    alterá-lo sem passar pela lógica da classe (nesse caso simples
+    não há validação, mas em qualquer refino futuro — por exemplo,
+    proibir string vazia — o setType() seria o único lugar a
+    mudar). Retornar const std::string& em vez de std::string
+    evita uma cópia desnecessária da string a cada chamada de
+    getType(), e o const na assinatura do método (getType() const)
+    documenta e garante em tempo de compilação que chamar esse
+    getter não modifica o objeto Weapon.
+
+----------------------------------------------------------------
+10. PONTEIROS PARA FUNÇÕES MEMBRO
+----------------------------------------------------------------
+O QUE:
+    Assim como existe ponteiro para uma variável, existe ponteiro
+    para uma função — e para uma função MEMBRO de uma classe a
+    sintaxe é: TipoRetorno (NomeClasse::*nomeVariavel)(Parâmetros).
+    Diferente de um ponteiro de função livre, um ponteiro para
+    função membro só pode ser chamado através de um objeto (ou
+    ponteiro/referência para objeto) daquela classe, porque a
+    função precisa de um "this" para operar.
+
+COMO usei:
+    ex05/Harl.cpp, dentro de complain():
+
+        std::string levels[4] = {"DEBUG", "INFO", "WARNING", "ERROR"};
+        void (Harl::*funcs[4])(void) = {&Harl::debug, &Harl::info, &Harl::warning, &Harl::error};
+
+        for (int i = 0; i < 4; i++)
+        {
+            if (levels[i] == level)
+            {
+                (this->*funcs[i])();
+                return;
+            }
+        }
+
+    "funcs" é um array de 4 ponteiros para métodos void sem
+    parâmetros de Harl. Para chamar o método apontado por
+    funcs[i] em cima do objeto atual, uso a sintaxe
+    (this->*funcs[i])() — os parênteses ao redor de
+    this->*funcs[i] são obrigatórios porque -> e * têm que ser
+    aplicados antes da chamada de função.
+
+POR QUE:
+    A alternativa óbvia seria uma cadeia de if/else ou um switch
+    comparando "level" e chamando debug()/info()/warning()/
+    error() manualmente em cada ramo. Isso funciona, mas duplica a
+    lógica de "achar o índice certo" e "chamar o método certo" em
+    lugares diferentes, e cresce linearmente em tamanho de código
+    a cada novo nível. Com o array de ponteiros para função,
+    ambos os arrays (levels e funcs) têm a mesma posição para o
+    mesmo conceito — adicionar um quinto nível é só acrescentar um
+    elemento em cada array, sem tocar no loop. O ponteiro para
+    função membro (em vez de ponteiro para função livre) é
+    necessário aqui porque debug/info/warning/error são métodos
+    privados de Harl que leem o estado do próprio objeto (mesmo
+    que nesse caso não leiam nenhum atributo, a assinatura exige
+    um objeto Harl para serem chamados) — não são funções soltas.
+
+----------------------------------------------------------------
+11. CONSTRUTOR PADRÃO vs CONSTRUTOR COM PARÂMETRO
+----------------------------------------------------------------
+O QUE:
+    Um construtor padrão (default constructor) é aquele que não
+    exige nenhum argumento. Uma classe só o tem automaticamente
+    se eu não declarar nenhum outro construtor; assim que declaro
+    um construtor com parâmetros, preciso declarar o padrão
+    manualmente se ainda quiser poder usá-lo.
+
+COMO usei:
+    ex00/Zombie.hpp só tem construtor com parâmetro:
+
+        Zombie(std::string name);
+
+    porque no ex00 todo Zombie já nasce com nome conhecido
+    (newZombie(name) / randomChump(name)).
+
+    ex01/Zombie.hpp precisou adicionar o construtor padrão:
+
+        Zombie();
+        ...
+        void setName(const std::string& name);
+
+    implementado como Zombie::Zombie() : name("") {} em
+    ex01/Zombie.cpp.
+
+POR QUE:
+    new Zombie[N] (visto na seção 3) não tem como passar um nome
+    diferente para cada um dos N zombies no momento da alocação —
+    ele só pode chamar um construtor sem argumentos para cada
+    elemento do array. Por isso o ex01 precisou de duas mudanças
+    conjuntas: um construtor padrão que deixa o zombie em um
+    estado válido porém "vazio" (name("")), e um setName()
+    público para preencher o nome depois, em um segundo passo
+    (o for dentro de zombieHorde()). Não seria possível resolver
+    isso mantendo só o construtor do ex00.
 
 ================================================================

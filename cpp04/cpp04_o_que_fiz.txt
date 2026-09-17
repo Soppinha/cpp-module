@@ -53,35 +53,4 @@ Por que fiz assim:
     emitir. A classe abstrata impede instanciar `Animal a;` por
     engano, que era um erro silencioso antes.
 
-----------------------------------------------------------------
-EX03 — Interface & recap
-----------------------------------------------------------------
-O que fiz:
-    AMateria: classe abstrata com tipo, clone() puro e use() puro.
-    Ice e Cure: derivadas concretas com clone() retornando new
-    da própria classe e use() com mensagem de efeito.
-    ICharacter e IMateriaSource: interfaces (só virtuais puras).
-    Character: implementa ICharacter com array de 4 slots (AMateria*).
-    MateriaSource: implementa IMateriaSource, aprende e cria Materias.
-
-Por que fiz assim:
-    clone() (padrão Prototype): Character::operator= pode copiar
-    cada slot sem saber o tipo concreto — chama clone() no ponteiro
-    base. Sem clone() precisaria de if/else para cada tipo.
-
-    unequip() não deleta: o enunciado especifica que o caller é
-    responsável pelo objeto desequipado. Deletar no unequip()
-    tornaria impossível guardar a materia antes de soltar o slot.
-
-    Character::operator= deleta slots antigos antes de clonar os
-    novos para não vazar memória na reatribuição.
-
-    MateriaSource guarda os templates aprendidos e no
-    createMateria() retorna clone() do template correspondente —
-    separação clara entre "aprender o tipo" e "criar instâncias".
-
-    Interfaces (ICharacter, IMateriaSource) permitem que o código
-    cliente dependa de contratos (interface), não de implementações
-    concretas — é o princípio de inversão de dependência no design.
-
 ================================================================

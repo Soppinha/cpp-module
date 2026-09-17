@@ -50,36 +50,4 @@ Por que fiz assim:
     no operator= da derivada evita duplicar a cópia dos campos
     herdados.
 
-----------------------------------------------------------------
-EX03 — Diamond Problem (DiamondTrap)
-----------------------------------------------------------------
-O que fiz:
-    ScavTrap e FragTrap passaram a herdar de ClapTrap com
-    `virtual public` para evitar duplicação.
-
-    DiamondTrap herda de ambos e tem seu próprio _name.
-    Construtor passa name + "_clap_name" para ClapTrap (exigência
-    do enunciado), e usa os valores de HP do FragTrap e EP do
-    ScavTrap.
-
-    whoAmI() imprime os dois nomes (DiamondTrap._name e
-    ClapTrap::_name) para mostrar a dualidade.
-
-Por que fiz assim:
-    Sem `virtual` na herança de ClapTrap, DiamondTrap teria dois
-    subobjetos ClapTrap separados — ambiguidade e duplicação de
-    dados. Com herança virtual, há um único ClapTrap compartilhado,
-    e DiamondTrap precisa chamar ClapTrap() diretamente na sua
-    lista de inicialização (as chamadas em ScavTrap e FragTrap
-    são ignoradas neste caso).
-
-    Ter _name próprio em DiamondTrap enquanto ClapTrap::_name
-    recebe o sufixo "_clap_name" demonstra concretamente o que o
-    diamond problem causa: sem virtual, "qual _name usar?" seria
-    ambíguo.
-
-    whoAmI() usa ClapTrap::_name explicitamente para resolver a
-    ambiguidade — sem o escopo, _name se referiria ao da
-    DiamondTrap.
-
 ================================================================

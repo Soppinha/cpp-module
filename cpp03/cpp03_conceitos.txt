@@ -1,99 +1,338 @@
 ================================================================
                   CPP MODULE 03 — CONCEITOS APRENDIDOS
 ================================================================
+Baseado no código real de ex00 (ClapTrap), ex01 (ScavTrap) e
+ex02 (FragTrap). O ex03 (DiamondTrap / herança virtual) não faz
+parte deste módulo mandatório, então herança múltipla e virtual
+NÃO aparecem aqui.
 
 ----------------------------------------------------------------
-1. HERANÇA (Inheritance)
+1. HERANÇA PÚBLICA (public inheritance)
 ----------------------------------------------------------------
-Uma classe derivada herda atributos e métodos da classe base.
+O QUE É:
+    Herança é o mecanismo pelo qual uma classe (derivada) reaproveita
+    atributos e métodos de outra (base), estabelecendo uma relação
+    "é um" (ScavTrap "é um" ClapTrap). Ao herdar com "public", os
+    membros public da base continuam public na derivada, e os
+    protected continuam protected — a interface não é degradada.
 
-    class ScavTrap : public ClapTrap { ... };
+COMO FOI USADO:
+    ex01/ScavTrap.hpp:18
+        class ScavTrap : public ClapTrap
+    ex02/FragTrap.hpp:18
+        class FragTrap : public ClapTrap
 
-public inheritance → a interface pública da base permanece
-                     pública na derivada (o mais comum).
+    Ambas herdam de ClapTrap com "public". Isso significa que um
+    ScavTrap ou FragTrap pode chamar attack(), takeDamage() e
+    beRepaired() diretamente, como se fossem métodos próprios,
+    porque essas funções são public em ClapTrap.
 
-A derivada pode:
-    - Usar os membros herdados diretamente.
-    - Sobrescrever métodos da base (override).
-    - Adicionar novos métodos.
+POR QUE FOI FEITO ASSIM:
+    "public" é o modo padrão de modelar "é um tipo de" em C++, e é
+    o que o enunciado pede (ScavTrap e FragTrap são especializações
+    de ClapTrap, não apenas classes que usam ClapTrap por composição).
+    Se fosse "private" ou "protected", os métodos herdados deixariam
+    de ser acessíveis de fora da classe derivada, quebrando o uso
+    esperado em main.cpp (ex: scav.attack(...), frag.beRepaired(...)).
 
 ----------------------------------------------------------------
-2. CADEIA DE CONSTRUTORES
+2. protected vs private NOS ATRIBUTOS DA BASE
 ----------------------------------------------------------------
-O construtor da derivada chama o da base na lista de inicialização.
-Se não chamado explicitamente, o compilador chama o padrão.
+O QUE É:
+    "private" torna um membro acessível apenas dentro da própria
+    classe. "protected" também bloqueia o acesso externo, mas
+    permite que classes derivadas acessem o membro diretamente,
+    sem precisar de getters/setters.
 
-    ScavTrap::ScavTrap(std::string const& name) : ClapTrap(name)
-    {
-        _hitPoints    = 100;
+COMO FOI USADO:
+    ex00/ClapTrap.hpp:20-24
+        protected:
+            std::string   _name;
+            unsigned int  _hitPoints;
+            unsigned int  _energyPoints;
+            unsigned int  _attackDamage;
+
+    Graças a isso, ScavTrap::ScavTrap(std::string const &name) em
+    ex01/ScavTrap.cpp:24-30 consegue fazer diretamente:
+        _hitPoints = 100;
         _energyPoints = 50;
         _attackDamage = 20;
-    }
+    sem precisar de nenhum método público de ClapTrap para alterar
+    esses valores. O mesmo vale para FragTrap.cpp:46-52 e para o
+    attack() sobrescrito de ScavTrap, que lê _hitPoints, _energyPoints
+    e _attackDamage herdados (ex01/ScavTrap.cpp:50-65).
 
-Ordem de construção: Base → Derivada
-Ordem de destruição: Derivada → Base (LIFO)
-
-----------------------------------------------------------------
-3. OVERRIDE DE MÉTODO
-----------------------------------------------------------------
-A derivada redefine um método da base com a mesma assinatura.
-Sem virtual na base, a versão chamada depende do tipo estático
-(tipo do ponteiro/referência), não do objeto real.
-
-    // ScavTrap redefine attack() de ClapTrap
-    void ScavTrap::attack(const std::string& target) { ... }
-
-----------------------------------------------------------------
-4. HERANÇA MÚLTIPLA
-----------------------------------------------------------------
-Uma classe pode herdar de mais de uma base ao mesmo tempo.
-
-    class DiamondTrap : public ScavTrap, public FragTrap { ... };
-
-Problema: se ScavTrap e FragTrap ambas herdam de ClapTrap,
-DiamondTrap teria DUAS cópias de ClapTrap — o Diamond Problem.
+POR QUE FOI FEITO ASSIM:
+    Se os atributos fossem "private" em ClapTrap, nenhuma classe
+    derivada conseguiria ler ou modificar _hitPoints, _energyPoints,
+    _attackDamage e _name — seria necessário adicionar getters e
+    setters só para permitir que ScavTrap/FragTrap ajustassem seus
+    próprios valores após o construtor da base rodar. "protected" é
+    o meio-termo: mantém os atributos escondidos do mundo externo
+    (main.cpp não pode fazer clap._hitPoints), mas dá às subclasses
+    o acesso direto que a lógica do exercício exige (cada subclasse
+    redefine HP/EP/AD com valores próprios logo após o construtor
+    da base rodar).
 
 ----------------------------------------------------------------
-5. HERANÇA VIRTUAL (virtual inheritance)
+3. ENCADEAMENTO DE CONSTRUTORES (lista de inicialização)
 ----------------------------------------------------------------
-Resolve o Diamond Problem: garante que exista apenas UMA
-instância da classe base compartilhada.
+O QUE É:
+    Uma classe derivada não pode inicializar os atributos herdados
+    diretamente na lista de inicialização do seu próprio construtor
+    (eles pertencem à base). Em vez disso, ela invoca explicitamente
+    um construtor da base na sua lista de inicialização, e só depois
+    ajusta o que for necessário no corpo do construtor.
 
-    class ScavTrap : virtual public ClapTrap { ... };
-    class FragTrap : virtual public ClapTrap { ... };
+COMO FOI USADO:
+    ex01/ScavTrap.cpp:24
+        ScavTrap::ScavTrap(std::string const &name) : ClapTrap(name)
+        {
+            _hitPoints = 100;
+            _energyPoints = 50;
+            _attackDamage = 20;
+            std::cout << "ScavTrap " << _name << " constructor called" << std::endl;
+        }
 
-    class DiamondTrap : public ScavTrap, public FragTrap { ... };
-    // agora há apenas um ClapTrap dentro de DiamondTrap
+    ex02/FragTrap.cpp:54
+        FragTrap::FragTrap(std::string const &name) : ClapTrap(name)
+        {
+            _hitPoints = 100;
+            _energyPoints = 100;
+            _attackDamage = 30;
+            ...
+        }
 
-Com herança virtual, DiamondTrap é responsável por chamar o
-construtor de ClapTrap diretamente na sua própria lista de
-inicialização:
+    Repare que ClapTrap(name) já inicializa _name, _hitPoints(10),
+    _energyPoints(10) e _attackDamage(0) (ex00/ClapTrap.cpp:21). O
+    corpo do construtor derivado então SOBRESCREVE _hitPoints,
+    _energyPoints e _attackDamage com os valores próprios de cada
+    robô, mas não precisa reatribuir _name, que já veio certo da base.
 
-    DiamondTrap::DiamondTrap(std::string const& name)
-        : ClapTrap(name + "_clap_name"), ScavTrap(name), FragTrap(name)
+POR QUE FOI FEITO ASSIM:
+    O enunciado não permite alterar a assinatura/lógica de ClapTrap
+    para aceitar HP/EP/AD customizados no construtor, então a única
+    forma de dar valores diferentes a ScavTrap e FragTrap é: 1) deixar
+    a base inicializar tudo com seus valores padrão via ClapTrap(name),
+    e 2) sobrescrever no corpo do construtor derivado. Chamar
+    ClapTrap(name) explicitamente também evita rodar o construtor
+    padrão ClapTrap() sem nome — sem essa chamada explícita, o
+    compilador chamaria ClapTrap() (sem argumentos) automaticamente,
+    e o nome do robô se perderia.
 
 ----------------------------------------------------------------
-6. RESOLUÇÃO DE AMBIGUIDADE COM ::
+4. ORDEM DE CONSTRUÇÃO E DESTRUIÇÃO EM HIERARQUIAS
 ----------------------------------------------------------------
-Quando há ambiguidade entre herança múltipla, usa-se o operador
-de escopo para escolher qual versão usar.
+O QUE É:
+    Numa hierarquia de herança, a base é sempre construída antes da
+    derivada (a derivada "usa" a base, então a base precisa existir
+    primeiro). Na destruição, a ordem é invertida: a derivada é
+    destruída primeiro, e só depois a base — como uma pilha (LIFO).
 
-    _hitPoints    = FragTrap::_hitPoints;   // HP do FragTrap
-    _energyPoints = ScavTrap::_energyPoints; // EP do ScavTrap
+COMO FOI USADO:
+    Rodando ex01 (ScavTrap scav("Scout")) a saída real é:
+        ClapTrap Scout constructor called
+        ScavTrap Scout constructor called
+        ...
+        ScavTrap Scout destructor called
+        ClapTrap Scout destructor called
 
-    ClapTrap::_name  // acessa o _name da subinstância ClapTrap
+    Isso acontece porque ScavTrap::ScavTrap(name) : ClapTrap(name)
+    (ex01/ScavTrap.cpp:24) força o construtor de ClapTrap a rodar
+    ANTES do corpo do construtor de ScavTrap. E o destrutor
+    ~ScavTrap() (ex01/ScavTrap.cpp:45) roda antes de ~ClapTrap()
+    (ex00/ClapTrap.cpp:44) ser chamado automaticamente ao final,
+    mesmo sem nenhuma chamada explícita — o compilador garante isso.
+
+POR QUE FOI FEITO ASSIM:
+    Faz sentido do ponto de vista de "quem depende de quem": o
+    ScavTrap usa/estende os atributos de ClapTrap, então esses
+    atributos precisam já existir (estar construídos) quando o
+    corpo do construtor de ScavTrap roda e faz _hitPoints = 100.
+    Na destruição, o inverso evita usar recursos da base que já
+    foram liberados: primeiro a derivada limpa o que é dela, depois
+    a base limpa o que é dela — nunca ao contrário.
 
 ----------------------------------------------------------------
-7. ENCADEAMENTO DE OPERADOR DE ATRIBUIÇÃO
+5. REDEFINIÇÃO DE MÉTODO SEM VIRTUAL (não é polimorfismo)
 ----------------------------------------------------------------
-A derivada chama o operator= da base para copiar os campos
-herdados, depois copia os seus próprios.
+O QUE É:
+    Quando uma classe derivada declara um método com a mesma
+    assinatura de um método da base, ela "esconde" (hides) a versão
+    da base para objetos do tipo derivado. Isso é diferente de
+    override polimórfico: sem a palavra-chave "virtual" na base, a
+    função chamada é decidida em tempo de compilação, com base no
+    tipo ESTÁTICO da variável/ponteiro/referência usada — não no
+    tipo real do objeto.
 
-    ScavTrap& ScavTrap::operator=(ScavTrap const& other)
-    {
-        if (this != &other)
-            ClapTrap::operator=(other);
-        return *this;
-    }
+COMO FOI USADO:
+    ex00/ClapTrap.hpp:33 declara attack() sem virtual:
+        void attack(const std::string &target);
+    ex01/ScavTrap.hpp:27 redeclara attack() com a mesma assinatura:
+        void attack(const std::string &target);
+    ex01/ScavTrap.cpp:50-65 dá uma implementação própria, que
+    imprime "ScavTrap" em vez de "ClapTrap" na mensagem de ataque.
+
+    Em main.cpp de ex01, scav é declarado e usado como ScavTrap
+    (ScavTrap scav("Scout"); scav.attack("enemy");), então
+    scav.attack(...) chama a versão de ScavTrap sem ambiguidade —
+    o tipo estático e o tipo real são o mesmo.
+
+POR QUE FOI FEITO ASSIM (e por que não precisa de virtual aqui):
+    attack() não foi declarado virtual porque em nenhum lugar do
+    código deste módulo um ScavTrap ou FragTrap é manipulado através
+    de um ponteiro ou referência para ClapTrap (não existe, por
+    exemplo, um "ClapTrap *p = &scav; p->attack(...)"). Todas as
+    chamadas em main.cpp usam o tipo concreto (ScavTrap, FragTrap),
+    então a resolução estática já entrega o comportamento certo, sem
+    o custo extra de uma vtable. Se em algum momento o código
+    guardasse objetos derivados em ClapTrap* ou ClapTrap&, e
+    esperasse que attack() chamasse a versão correta do objeto real,
+    aí sim seria obrigatório marcar attack() como virtual na base —
+    caso contrário haveria "object slicing"/despacho errado
+    (chamaria sempre ClapTrap::attack, não a versão redefinida).
+
+----------------------------------------------------------------
+6. CONSTRUTOR DE CÓPIA E OPERATOR= ENCADEADOS (forma canônica)
+----------------------------------------------------------------
+O QUE É:
+    A "forma canônica" de uma classe em C++98 inclui: construtor
+    padrão, construtor de cópia, operator= de cópia e destrutor.
+    Em hierarquias, o construtor de cópia e o operator= da derivada
+    devem delegar a cópia dos membros herdados para a base, em vez
+    de copiá-los manualmente (o que duplicaria lógica e quebraria
+    encapsulamento, já que atributos protected ainda pertencem
+    conceitualmente à base).
+
+COMO FOI USADO:
+    Construtor de cópia de ScavTrap (ex01/ScavTrap.cpp:32-36):
+        ScavTrap::ScavTrap(ScavTrap const &other) : ClapTrap(other)
+        {
+            std::cout << "ScavTrap copy constructor called" << std::endl;
+            *this = other;
+        }
+
+    operator= de ScavTrap (ex01/ScavTrap.cpp:38-43):
+        ScavTrap &ScavTrap::operator=(ScavTrap const &other)
+        {
+            if (this != &other)
+                ClapTrap::operator=(other);
+            return *this;
+        }
+
+    FragTrap segue exatamente o mesmo padrão em
+    ex02/FragTrap.cpp:62-73. Note que ClapTrap::operator=(other)
+    é chamado explicitamente com o operador de escopo "::" — sem
+    isso, "operator=(other)" dentro de ScavTrap::operator= chamaria
+    a si mesmo recursivamente (ou nem compilaria, dependendo da
+    conversão implícita), pois other é um ScavTrap, não um ClapTrap
+    puro, mas o operador base espera ClapTrap const&.
+
+POR QUE FOI FEITO ASSIM:
+    Chamar ClapTrap::operator=(other) reaproveita a lógica que já
+    existe em ClapTrap (ex00/ClapTrap.cpp:32-42), que copia _name,
+    _hitPoints, _energyPoints e _attackDamage com a checagem de
+    auto-atribuição (this != &other). Copiar esses campos "na mão"
+    dentro de ScavTrap seria duplicação de código e um risco: se
+    ClapTrap ganhasse um novo atributo no futuro, o operator= de
+    ScavTrap ficaria desatualizado silenciosamente. Delegar para a
+    base garante que a cópia da "parte ClapTrap" do objeto sempre
+    siga a única fonte de verdade.
+
+----------------------------------------------------------------
+7. unsigned int E O CUIDADO COM UNDERFLOW
+----------------------------------------------------------------
+O QUE É:
+    unsigned int não tem valores negativos: ao subtrair um número
+    maior do que o valor atual, o resultado não fica negativo, ele
+    "dá a volta" (wraparound) e vira um número gigantesco perto do
+    limite máximo do tipo (ex.: 0 - 1 vira 4294967295 em 32 bits).
+    Isso é diferente do comportamento de um int comum.
+
+COMO FOI USADO:
+    ex00/ClapTrap.cpp:66-79 (takeDamage), herdado sem alteração
+    por ScavTrap e FragTrap:
+        void ClapTrap::takeDamage(unsigned int amount)
+        {
+            if (_hitPoints == 0)
+            {
+                std::cout << ... "is already dead!" ...;
+                return;
+            }
+            if (amount >= _hitPoints)
+                _hitPoints = 0;
+            else
+                _hitPoints -= amount;
+            ...
+        }
+
+    A checagem "if (amount >= _hitPoints) _hitPoints = 0;" evita
+    que "_hitPoints -= amount" seja executado quando amount é maior
+    que _hitPoints.
+
+POR QUE FOI FEITO ASSIM:
+    Sem essa checagem, chamar clap.takeDamage(20) num ClapTrap com
+    _hitPoints == 10 faria _hitPoints -= 20 estourar para um valor
+    próximo de 4 bilhões, fazendo o robô parecer "quase invencível"
+    em vez de morto — um bug silencioso e grave, já que não há erro
+    de compilação nem exceção, apenas um número absurdo. Clampar
+    manualmente em 0 antes de subtrair é a forma correta e segura de
+    lidar com subtração em tipos sem sinal, e é reaproveitada por
+    ScavTrap e FragTrap automaticamente por herança, sem precisar
+    reescrever a função (nenhuma das duas classes redefine
+    takeDamage() nem beRepaired()).
+
+----------------------------------------------------------------
+8. VALORES-PADRÃO x SOBRESCRITA DE ATRIBUTOS HERDADOS
+----------------------------------------------------------------
+O QUE É:
+    Uma classe derivada pode manter os atributos herdados com os
+    valores que a base atribuiu, ou sobrescrevê-los no corpo do seu
+    próprio construtor para representar uma variação/especialização
+    do conceito da base.
+
+COMO FOI USADO:
+    ClapTrap "genérico": _hitPoints(10), _energyPoints(10),
+    _attackDamage(0) — ex00/ClapTrap.cpp:16,21.
+
+    ScavTrap sobrescreve para _hitPoints=100, _energyPoints=50,
+    _attackDamage=20 (ex01/ScavTrap.cpp:26-28).
+
+    FragTrap sobrescreve para _hitPoints=100, _energyPoints=100,
+    _attackDamage=30 (ex02/FragTrap.cpp:48-50).
+
+POR QUE FOI FEITO ASSIM:
+    Cada subclasse representa uma "variante" de ClapTrap com
+    estatísticas de jogo diferentes (ScavTrap é um "coletor de
+    lixo" resistente mas com pouca energia; FragTrap é uma "unidade
+    de combate" com muita energia e mais dano). Herdar de ClapTrap
+    evita reescrever attack(), takeDamage(), beRepaired() e toda a
+    forma canônica do zero — só os valores numéricos e (no caso do
+    ScavTrap) a mensagem de attack() precisam mudar. Isso é o
+    objetivo central de herança: reaproveitar comportamento comum e
+    especializar apenas o que muda.
+
+----------------------------------------------------------------
+9. MÉTODOS EXCLUSIVOS DA CLASSE DERIVADA
+----------------------------------------------------------------
+O QUE É:
+    Além de herdar e redefinir métodos da base, uma classe derivada
+    pode adicionar métodos totalmente novos, que só existem nela.
+
+COMO FOI USADO:
+    ScavTrap adiciona guardGate() (ex01/ScavTrap.hpp:28,
+    ScavTrap.cpp:67-70), que não existe em ClapTrap.
+    FragTrap adiciona highFivesGuys() (ex02/FragTrap.hpp:27,
+    FragTrap.cpp:80-83).
+
+POR QUE FOI FEITO ASSIM:
+    guardGate() e highFivesGuys() são comportamentos que fazem
+    sentido apenas para aquele robô específico (modo "guarda-portão"
+    do ScavTrap; pedido de high-five do FragTrap), então não devem
+    poluir a interface de ClapTrap, que é compartilhada por todas as
+    variantes. Isso é consistente com o princípio de manter a classe
+    base enxuta e genérica, deixando as especializações em cada
+    derivada.
 
 ================================================================
+

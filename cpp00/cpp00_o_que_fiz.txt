@@ -50,30 +50,4 @@ Por que fiz assim:
     futuros std::getline — caso contrário a próxima leitura
     capturaria uma linha vazia.
 
-----------------------------------------------------------------
-EX02 — Account
-----------------------------------------------------------------
-O que fiz:
-    Implementei Account.cpp seguindo exatamente o header
-    Account.hpp fornecido pelo enunciado (não podia modificá-lo).
-
-    - 4 variáveis estáticas rastreiam o estado global de todas
-      as contas (_nbAccounts, _totalAmount, etc.).
-    - Cada operação (construtor, depósito, saque) atualiza
-      simultaneamente o estado do objeto e o estado estático.
-    - _displayTimestamp() formata a hora atual com strftime no
-      padrão YYYYMMDD_HHMMSS exigido pelo log de referência.
-    - makeWithdrawal() retorna false e imprime "refused" se o
-      saldo for insuficiente — sem lançar exceção, apenas guarda
-      o estado correto.
-
-Por que fiz assim:
-    O desafio era descobrir o comportamento esperado apenas
-    olhando o log de referência (19920104_091532.log) e o header.
-    O formato de saída de cada linha (chave:valor;chave:valor)
-    tinha que bater exatamente. Segui a ordem dos campos no log
-    para inferir o que cada método devia imprimir e em que momento
-    as variáveis globais eram atualizadas (antes ou depois da
-    impressão do novo saldo).
-
 ================================================================
